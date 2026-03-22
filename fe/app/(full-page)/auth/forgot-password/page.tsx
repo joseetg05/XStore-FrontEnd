@@ -21,7 +21,7 @@ const ForgotPasswordPage = () => {
                     <div className="w-full surface-card py-8 px-5 sm:px-8 flex flex-column" style={{ borderRadius: '53px' }}>
                         <div className="text-center mb-5">
                             <div className="text-900 text-3xl font-medium mb-3">Forgot Password</div>
-                            <span className="text-600 font-medium">Enter your email and we'll send you a recovery link</span>
+                            <span className="text-600 font-medium">Enter your email and we&apos;ll send you a recovery link</span>
                         </div>
                         
                         <div>

@@ -8,8 +8,8 @@ import { Message } from 'primereact/message';
 import { Password } from 'primereact/password';
 import { Toast } from 'primereact/toast';
 import { classNames } from 'primereact/utils';
-import { LayoutContext } from '../../../../layout/context/layoutcontext';
-import { AuthService } from '../../../../service/AuthService';
+import { LayoutContext } from '@/layout/context/layoutcontext';
+import { AuthService } from '@/service/AuthService';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');

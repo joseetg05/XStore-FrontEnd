@@ -8,8 +8,8 @@ import { InputText } from 'primereact/inputtext';
 import { Message } from 'primereact/message';
 import { Password } from 'primereact/password';
 import { classNames } from 'primereact/utils';
-import { LayoutContext } from '../../../../layout/context/layoutcontext';
-import { AuthService, RegisterPayload } from '../../../../service/AuthService';
+import { LayoutContext } from '@/layout/context/layoutcontext';
+import { AuthService, RegisterPayload } from '@/service/AuthService';
 
 const RegisterPage = () => {
     const [form, setForm] = useState<Omit<RegisterPayload, ''>>({
