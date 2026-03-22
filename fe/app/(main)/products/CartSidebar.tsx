@@ -8,6 +8,7 @@ import { Sidebar } from 'primereact/sidebar';
 
 import { useCart } from '../../../context/CartContext';
 import { Discount, ProductService } from '../../../service/ProductService';
+import { AuthService } from '../../../service/AuthService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -163,7 +164,14 @@ const CartSidebar = ({ visible, onHide }: CartSidebarProps) => {
                                 icon="pi pi-credit-card"
                                 className="w-full mb-2"
                                 disabled={isEmpty}
-                                onClick={() => { onHide(); router.push('/checkout'); }}
+                                onClick={() => {
+                                    onHide();
+                                    if (AuthService.isAuthenticated()) {
+                                        router.push('/checkout');
+                                    } else {
+                                        router.push('/auth/login?redirect=/checkout');
+                                    }
+                                }}
                             />
                             <Button
                                 label="Vaciar Carrito"
