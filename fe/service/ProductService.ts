@@ -16,6 +16,11 @@ export interface Discount {
     percentage: number; // e.g., 20 for 20%
 }
 
+/**
+ * Maps to the backend table columns:
+ * PRD_ID, PRD_TIPO_PRD_ID, PRD_MARCA_PRD_ID, PRD_RutaImagen,
+ * PRD_Descripcion, PRD_DESC_ID, PRD_PrecioCompra, PRD_PrecioVenta, PRD_Estado
+ */
 export interface Product {
     id: number;
     productTypeId: number;
@@ -34,6 +39,12 @@ export interface ProductFilters {
     search?: string;
     sortBy?: 'price' | 'description';
     sortOrder?: 'asc' | 'desc';
+}
+
+export interface ProductResult {
+    success: boolean;
+    product?: Product;
+    error?: string;
 }
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
@@ -67,8 +78,8 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 1,
         imageUrl: '/layout/images/products/iPhone 15 Pro 8GB + 256GB Negro.png',
         description: 'iPhone 15 Pro 8GB + 256GB Negro',
-        discountId: 1, // 10% off
-        purchasePrice: 700,
+        discountId: 1,
+        purchasePrice: 700000,
         salePrice: 1009900,
         status: true
     },
@@ -89,7 +100,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 6,
         imageUrl: 'https://via.placeholder.com/300x200?text=Sony+WH-1000XM5',
         description: 'Sony WH-1000XM5',
-        discountId: 2, // 25% off
+        discountId: 2,
         purchasePrice: 200,
         salePrice: 349,
         status: true
@@ -158,7 +169,7 @@ const MOCK_PRODUCTS: Product[] = [
         discountId: 0,
         purchasePrice: 350,
         salePrice: 699,
-        status: false // inactive — should NOT appear
+        status: false // inactive — should NOT appear in catalog
     },
     {
         id: 10,
@@ -166,12 +177,41 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 4,
         imageUrl: 'https://via.placeholder.com/300x200?text=Adidas+T-Shirt',
         description: 'Camiseta Adidas',
-        discountId: 3, // 50% off
+        discountId: 3,
         purchasePrice: 15,
         salePrice: 35,
         status: true
     }
 ];
+
+// ─── localStorage Helpers ─────────────────────────────────────────────────────
+
+const PRODUCTS_STORAGE_KEY = 'xstore-products';
+
+const loadProducts = (): Product[] => {
+    try {
+        if (typeof window === 'undefined') return MOCK_PRODUCTS;
+        const raw = localStorage.getItem(PRODUCTS_STORAGE_KEY);
+        if (!raw) {
+            // Seed localStorage with mock data on first load
+            localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(MOCK_PRODUCTS));
+            return MOCK_PRODUCTS;
+        }
+        return JSON.parse(raw) as Product[];
+    } catch {
+        return MOCK_PRODUCTS;
+    }
+};
+
+const saveProducts = (products: Product[]): void => {
+    try {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
+        }
+    } catch {
+        // Silently fail if localStorage is unavailable
+    }
+};
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -180,7 +220,7 @@ export const ProductService = {
      * Returns all available product types.
      */
     getProductTypes(): Promise<ProductType[]> {
-        // TODO: habilitar cuando exista backend
+        // TODO: habilitar cuando exista backend real
         // return fetch(`${process.env.NEXT_PUBLIC_API_URL}/product-types`).then(r => r.json());
         return Promise.resolve(MOCK_PRODUCT_TYPES);
     },
@@ -189,7 +229,7 @@ export const ProductService = {
      * Retorna todas las marcas disponibles.
      */
     getBrands(): Promise<Brand[]> {
-        // TODO: habilitar cuando exista backend
+        // TODO: habilitar cuando exista backend real
         // return fetch(`${process.env.NEXT_PUBLIC_API_URL}/brands`).then(r => r.json());
         return Promise.resolve(MOCK_BRANDS);
     },
@@ -198,56 +238,131 @@ export const ProductService = {
      * Retorna todos los descuentos disponibles.
      */
     getDiscounts(): Promise<Discount[]> {
+        // TODO: habilitar cuando exista backend real
+        // return fetch(`${process.env.NEXT_PUBLIC_API_URL}/discounts`).then(r => r.json());
         return Promise.resolve(MOCK_DISCOUNTS);
     },
 
     /**
-     * Retorna los productos aplicando los filtros dados.
-     * Solo se retornan productos activos (status === true).
+     * Retorna TODOS los productos (activos e inactivos).
+     * Usado por el panel de administración.
      *
-     * @param filters - Filtros opcionales para productTypeId, brandId, y término de búsqueda.
+     * TODO: habilitar cuando exista backend real
+     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products`).then(r => r.json());
      */
-    getProducts(filters?: ProductFilters): Promise<Product[]> {
-        // TODO: habilitar cuando exista backend
-        // const params = new URLSearchParams();
-        // if (filters?.productTypeId) params.append('productTypeId', String(filters.productTypeId));
-        // if (filters?.brandId) params.append('brandId', String(filters.brandId));
-        // if (filters?.search) params.append('search', filters.search);
-        // return fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?${params}`).then(r => r.json());
+    getAllProducts(): Promise<Product[]> {
+        return Promise.resolve(loadProducts());
+    },
 
-        let results = MOCK_PRODUCTS.filter((p) => p.status === true);
+    /**
+     * Retorna solo los productos activos (status === true).
+     * Usado por el catálogo público.
+     *
+     * TODO: habilitar cuando exista backend real
+     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?status=active`).then(r => r.json());
+     */
+    getActiveProducts(filters?: ProductFilters): Promise<Product[]> {
+        let results = loadProducts().filter((p) => p.status === true);
 
         if (filters?.productTypeId) {
             results = results.filter((p) => p.productTypeId === filters.productTypeId);
         }
-
         if (filters?.brandId) {
             results = results.filter((p) => p.brandId === filters.brandId);
         }
-
         if (filters?.search && filters.search.trim() !== '') {
             const query = filters.search.trim().toLowerCase();
             results = results.filter((p) => p.description.toLowerCase().includes(query));
         }
-
         if (filters?.sortBy) {
             const order = filters.sortOrder === 'desc' ? -1 : 1;
             const field = filters.sortBy === 'price' ? 'salePrice' : 'description';
-
             results.sort((a, b) => {
                 const valA = a[field as keyof Product];
                 const valB = b[field as keyof Product];
-
-                if (typeof valA === 'string' && typeof valB === 'string') {
-                    return valA.localeCompare(valB) * order;
-                }
-                if (typeof valA === 'number' && typeof valB === 'number') {
-                    return (valA - valB) * order;
-                }
+                if (typeof valA === 'string' && typeof valB === 'string') return valA.localeCompare(valB) * order;
+                if (typeof valA === 'number' && typeof valB === 'number') return (valA - valB) * order;
                 return 0;
             });
         }
 
         return Promise.resolve(results);
+    },
+
+    /**
+     * Alias for backwards compatibility — delegates to getActiveProducts with filters.
+     */
+    getProducts(filters?: ProductFilters): Promise<Product[]> {
+        return ProductService.getActiveProducts(filters);
+    },
+
+    /**
+     * Creates a new product and persists it.
+     *
+     * TODO: habilitar cuando exista backend real
+     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products`, {
+     *   method: 'POST', headers: { 'Content-Type': 'application/json' },
+     *   body: JSON.stringify(productData)
+     * }).then(r => r.json());
+     */
+    createProduct(productData: Omit<Product, 'id'>): Promise<ProductResult> {
+        const products = loadProducts();
+        const newId = products.length > 0 ? Math.max(...products.map((p) => p.id)) + 1 : 1;
+        const newProduct: Product = { id: newId, ...productData };
+        products.push(newProduct);
+        saveProducts(products);
+        return Promise.resolve({ success: true, product: newProduct });
+    },
+
+    /**
+     * Updates an existing product and persists the change.
+     *
+     * TODO: habilitar cuando exista backend real
+     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products/${product.id}`, {
+     *   method: 'PUT', headers: { 'Content-Type': 'application/json' },
+     *   body: JSON.stringify(product)
+     * }).then(r => r.json());
+     */
+    updateProduct(product: Product): Promise<ProductResult> {
+        const products = loadProducts();
+        const index = products.findIndex((p) => p.id === product.id);
+        if (index === -1) return Promise.resolve({ success: false, error: 'Producto no encontrado.' });
+        products[index] = product;
+        saveProducts(products);
+        return Promise.resolve({ success: true, product });
+    },
+
+    /**
+     * Deletes a product by ID.
+     *
+     * TODO: habilitar cuando exista backend real
+     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products/${id}`, {
+     *   method: 'DELETE'
+     * }).then(r => r.json());
+     */
+    deleteProduct(id: number): Promise<{ success: boolean; error?: string }> {
+        const products = loadProducts();
+        const index = products.findIndex((p) => p.id === id);
+        if (index === -1) return Promise.resolve({ success: false, error: 'Producto no encontrado.' });
+        products.splice(index, 1);
+        saveProducts(products);
+        return Promise.resolve({ success: true });
+    },
+
+    /**
+     * Toggles the status (active/inactive) of a product.
+     *
+     * TODO: habilitar cuando exista backend real
+     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products/${id}/toggle-status`, {
+     *   method: 'PATCH'
+     * }).then(r => r.json());
+     */
+    toggleProductStatus(id: number): Promise<ProductResult> {
+        const products = loadProducts();
+        const index = products.findIndex((p) => p.id === id);
+        if (index === -1) return Promise.resolve({ success: false, error: 'Producto no encontrado.' });
+        products[index] = { ...products[index], status: !products[index].status };
+        saveProducts(products);
+        return Promise.resolve({ success: true, product: products[index] });
     }
 };
