@@ -10,6 +10,12 @@ export interface Brand {
     name: string;
 }
 
+export interface Discount {
+    id: number;
+    name: string;
+    percentage: number; // e.g., 20 for 20%
+}
+
 export interface Product {
     id: number;
     productTypeId: number;
@@ -26,24 +32,32 @@ export interface ProductFilters {
     productTypeId?: number | null;
     brandId?: number | null;
     search?: string;
+    sortBy?: 'price' | 'description';
+    sortOrder?: 'asc' | 'desc';
 }
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
 const MOCK_PRODUCT_TYPES: ProductType[] = [
-    { id: 1, name: 'Electronics' },
-    { id: 2, name: 'Clothing' },
-    { id: 3, name: 'Accessories' },
-    { id: 4, name: 'Home & Garden' }
+    { id: 1, name: 'Celulares' },
+    { id: 2, name: 'Ropa' },
+    { id: 3, name: 'Accesorios' },
+    { id: 4, name: 'Hogar y Jardín' }
 ];
 
 const MOCK_BRANDS: Brand[] = [
     { id: 1, name: 'Apple' },
-    { id: 2, name: 'Samsung' },
+    { id: 2, name: 'Motorola' },
     { id: 3, name: 'Nike' },
     { id: 4, name: 'Adidas' },
     { id: 5, name: 'IKEA' },
     { id: 6, name: 'Sony' }
+];
+
+const MOCK_DISCOUNTS: Discount[] = [
+    { id: 1, name: 'Oferta de Lanzamiento', percentage: 10 },
+    { id: 2, name: 'Liquidación de Temporada', percentage: 25 },
+    { id: 3, name: 'Descuento Especial', percentage: 50 }
 ];
 
 const MOCK_PRODUCTS: Product[] = [
@@ -53,29 +67,29 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 1,
         imageUrl: '/layout/images/products/iPhone 15 Pro 8GB + 256GB Negro.png',
         description: 'iPhone 15 Pro 8GB + 256GB Negro',
-        discountId: 0,
+        discountId: 1, // 10% off
         purchasePrice: 700,
-        salePrice: 999,
+        salePrice: 1009900,
         status: true
     },
     {
         id: 2,
         productTypeId: 1,
         brandId: 2,
-        imageUrl: 'https://via.placeholder.com/300x200?text=Galaxy+S24',
-        description: 'Galaxy S24',
-        discountId: 0,
-        purchasePrice: 550,
-        salePrice: 849,
+        imageUrl: '/layout/images/products/Motorola G56 8GB + 256GB Verde.png',
+        description: 'Motorola G56 8GB + 256GB Verde',
+        discountId: 2,
+        purchasePrice: 60000,
+        salePrice: 99895,
         status: true
     },
     {
         id: 3,
-        productTypeId: 1,
+        productTypeId: 2,
         brandId: 6,
         imageUrl: 'https://via.placeholder.com/300x200?text=Sony+WH-1000XM5',
         description: 'Sony WH-1000XM5',
-        discountId: 0,
+        discountId: 2, // 25% off
         purchasePrice: 200,
         salePrice: 349,
         status: true
@@ -118,7 +132,7 @@ const MOCK_PRODUCTS: Product[] = [
         productTypeId: 3,
         brandId: 3,
         imageUrl: 'https://via.placeholder.com/300x200?text=Nike+Cap',
-        description: 'Nike Cap',
+        description: 'Gorra Nike',
         discountId: 0,
         purchasePrice: 12,
         salePrice: 30,
@@ -151,8 +165,8 @@ const MOCK_PRODUCTS: Product[] = [
         productTypeId: 2,
         brandId: 4,
         imageUrl: 'https://via.placeholder.com/300x200?text=Adidas+T-Shirt',
-        description: 'Adidas T-Shirt',
-        discountId: 0,
+        description: 'Camiseta Adidas',
+        discountId: 3, // 50% off
         purchasePrice: 15,
         salePrice: 35,
         status: true
@@ -172,7 +186,7 @@ export const ProductService = {
     },
 
     /**
-     * Returns all available brands.
+     * Retorna todas las marcas disponibles.
      */
     getBrands(): Promise<Brand[]> {
         // TODO: habilitar cuando exista backend
@@ -181,10 +195,17 @@ export const ProductService = {
     },
 
     /**
-     * Returns products applying the given filters.
-     * Only active products (status === true) are returned.
+     * Retorna todos los descuentos disponibles.
+     */
+    getDiscounts(): Promise<Discount[]> {
+        return Promise.resolve(MOCK_DISCOUNTS);
+    },
+
+    /**
+     * Retorna los productos aplicando los filtros dados.
+     * Solo se retornan productos activos (status === true).
      *
-     * @param filters - Optional filters for productTypeId, brandId, and search query.
+     * @param filters - Filtros opcionales para productTypeId, brandId, y término de búsqueda.
      */
     getProducts(filters?: ProductFilters): Promise<Product[]> {
         // TODO: habilitar cuando exista backend
@@ -207,6 +228,24 @@ export const ProductService = {
         if (filters?.search && filters.search.trim() !== '') {
             const query = filters.search.trim().toLowerCase();
             results = results.filter((p) => p.description.toLowerCase().includes(query));
+        }
+
+        if (filters?.sortBy) {
+            const order = filters.sortOrder === 'desc' ? -1 : 1;
+            const field = filters.sortBy === 'price' ? 'salePrice' : 'description';
+
+            results.sort((a, b) => {
+                const valA = a[field as keyof Product];
+                const valB = b[field as keyof Product];
+
+                if (typeof valA === 'string' && typeof valB === 'string') {
+                    return valA.localeCompare(valB) * order;
+                }
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    return (valA - valB) * order;
+                }
+                return 0;
+            });
         }
 
         return Promise.resolve(results);

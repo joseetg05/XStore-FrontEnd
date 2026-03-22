@@ -1,6 +1,6 @@
 'use client';
-import React, { createContext, useCallback, useContext, useState } from 'react';
-import { Product } from '../service/ProductService';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Discount, Product, ProductService } from '../service/ProductService';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -32,6 +32,11 @@ const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const [discounts, setDiscounts] = useState<Discount[]>([]);
+
+    useEffect(() => {
+        ProductService.getDiscounts().then(setDiscounts);
+    }, []);
 
     const addToCart = useCallback((product: Product) => {
         setCartItems((prev) => {
@@ -69,9 +74,15 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
     const getTotals = useCallback((): CartTotals => {
         const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-        const subtotal = cartItems.reduce((sum, item) => sum + item.product.salePrice * item.quantity, 0);
+
+        const subtotal = cartItems.reduce((sum, item) => {
+            const discount = discounts.find((d) => d.id === item.product.discountId);
+            const price = discount ? item.product.salePrice * (1 - discount.percentage / 100) : item.product.salePrice;
+            return sum + price * item.quantity;
+        }, 0);
+
         return { totalItems, subtotal, total: subtotal };
-    }, [cartItems]);
+    }, [cartItems, discounts]);
 
     return (
         <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, updateQuantity, clearCart, getTotals }}>

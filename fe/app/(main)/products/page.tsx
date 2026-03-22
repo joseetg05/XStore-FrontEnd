@@ -10,13 +10,13 @@ import { Sidebar } from 'primereact/sidebar';
 import { Tag } from 'primereact/tag';
 
 import { CartProvider, useCart } from '../../../context/CartContext';
-import { Brand, Product, ProductFilters, ProductService, ProductType } from '../../../service/ProductService';
+import { Brand, Discount, Product, ProductFilters, ProductService, ProductType } from '../../../service/ProductService';
 import CartSidebar from './CartSidebar';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const formatCurrency = (value: number) =>
-    value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    value.toLocaleString('es-CR', { style: 'currency', currency: 'CRC' });
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
 
@@ -24,13 +24,17 @@ interface ProductCardProps {
     product: Product;
     brands: Brand[];
     productTypes: ProductType[];
+    discounts: Discount[];
     onView: (product: Product) => void;
     onAddToCart: (product: Product) => void;
 }
 
-const ProductCard = ({ product, brands, productTypes, onView, onAddToCart }: ProductCardProps) => {
+const ProductCard = ({ product, brands, productTypes, discounts, onView, onAddToCart }: ProductCardProps) => {
     const brand = brands.find((b) => b.id === product.brandId);
     const type = productTypes.find((t) => t.id === product.productTypeId);
+    const discount = discounts.find((d) => d.id === product.discountId);
+
+    const discountedPrice = discount ? product.salePrice * (1 - discount.percentage / 100) : product.salePrice;
 
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
         e.currentTarget.src = 'https://static.thenounproject.com/png/504708-200.png';
@@ -63,22 +67,38 @@ const ProductCard = ({ product, brands, productTypes, onView, onAddToCart }: Pro
                     {brand && (
                         <Tag value={brand.name} severity="warning" rounded />
                     )}
+                    {discount && (
+                        <Tag value={`-${discount.percentage}%`} severity="danger" rounded />
+                    )}
                 </div>
 
                 <Divider className="my-1" />
 
                 <div className="flex align-items-center justify-content-between">
                     <div>
-                        <span className="text-500 text-sm">Sale price</span>
-                        <div className="text-900 font-bold text-xl" style={{ color: 'var(--primary-color)' }}>
-                            {formatCurrency(product.salePrice)}
+                        <span className="text-500 text-sm">Precio de venta</span>
+                        <div className="flex align-items-center gap-2">
+                            {discount ? (
+                                <>
+                                    <span className="text-900 font-bold text-xl" style={{ color: '#e91e63' }}>
+                                        {formatCurrency(discountedPrice)}
+                                    </span>
+                                    <span className="text-500 text-sm line-through">
+                                        {formatCurrency(product.salePrice)}
+                                    </span>
+                                </>
+                            ) : (
+                                <div className="text-900 font-bold text-xl" style={{ color: 'var(--primary-color)' }}>
+                                    {formatCurrency(product.salePrice)}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="flex gap-2">
                         <Button
                             icon="pi pi-cart-plus"
                             size="small"
-                            tooltip="Add to cart"
+                            tooltip="Agregar al carrito"
                             tooltipOptions={{ position: 'top' }}
                             rounded
                             onClick={() => onAddToCart(product)}
@@ -88,7 +108,7 @@ const ProductCard = ({ product, brands, productTypes, onView, onAddToCart }: Pro
                             size="small"
                             outlined
                             rounded
-                            tooltip="Preview"
+                            tooltip="Ver detalle"
                             tooltipOptions={{ position: 'top' }}
                             onClick={() => onView(product)}
                         />
@@ -104,8 +124,8 @@ const ProductCard = ({ product, brands, productTypes, onView, onAddToCart }: Pro
 const EmptyState = () => (
     <div className="col-12 flex flex-column align-items-center justify-content-center py-8 text-center">
         <i className="pi pi-search" style={{ fontSize: '3rem', color: 'var(--text-color-secondary)' }}></i>
-        <h4 className="mt-3 mb-1 text-900">No products found</h4>
-        <p className="text-500 m-0">Try adjusting your filters or clearing your search.</p>
+        <h4 className="mt-3 mb-1 text-900">No se encontraron productos</h4>
+        <p className="text-500 m-0">Intenta ajustando los filtros o limpiando la búsqueda.</p>
     </div>
 );
 
@@ -134,41 +154,41 @@ const FilterSidebar = ({
     onBrandChange,
     onClear
 }: FilterSidebarProps) => {
-    const typeOptions = [{ id: null, name: 'All types' }, ...productTypes];
-    const brandOptions = [{ id: null, name: 'All brands' }, ...brands];
+    const typeOptions = [{ id: null, name: 'Todos los tipos' }, ...productTypes];
+    const brandOptions = [{ id: null, name: 'Todas las marcas' }, ...brands];
 
     return (
-        <Sidebar visible={visible} onHide={onHide} header="Filters" className="w-full md:w-20rem">
+        <Sidebar visible={visible} onHide={onHide} header="Filtros" className="w-full md:w-20rem">
             <div className="flex flex-column gap-4 pt-2">
                 <div>
-                    <label className="block text-900 font-medium mb-2">Product Type</label>
+                    <label className="block text-900 font-medium mb-2">Tipo de Producto</label>
                     <Dropdown
                         value={selectedTypeId}
                         options={typeOptions}
                         optionLabel="name"
                         optionValue="id"
                         onChange={(e) => onTypeChange(e.value)}
-                        placeholder="Select a type"
+                        placeholder="Selecciona un tipo"
                         className="w-full"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-900 font-medium mb-2">Brand</label>
+                    <label className="block text-900 font-medium mb-2">Marca</label>
                     <Dropdown
                         value={selectedBrandId}
                         options={brandOptions}
                         optionLabel="name"
                         optionValue="id"
                         onChange={(e) => onBrandChange(e.value)}
-                        placeholder="Select a brand"
+                        placeholder="Selecciona una marca"
                         className="w-full"
                     />
                 </div>
 
                 <Divider />
 
-                <Button label="Clear Filters" icon="pi pi-times" severity="secondary" outlined onClick={onClear} />
+                <Button label="Limpiar Filtros" icon="pi pi-times" severity="secondary" outlined onClick={onClear} />
             </div>
         </Sidebar>
     );
@@ -183,6 +203,7 @@ const ProductsPageInner = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [productTypes, setProductTypes] = useState<ProductType[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
+    const [discounts, setDiscounts] = useState<Discount[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [filterVisible, setFilterVisible] = useState(false);
@@ -190,15 +211,28 @@ const ProductsPageInner = () => {
     const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
     const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortKey, setSortKey] = useState<string | null>(null);
 
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [displayProductDialog, setDisplayProductDialog] = useState(false);
 
+    const sortOptions = [
+        { label: 'Precio: Menor a Mayor', value: 'price_asc' },
+        { label: 'Precio: Mayor a Menor', value: 'price_desc' },
+        { label: 'Nombre: A a Z', value: 'description_asc' },
+        { label: 'Nombre: Z a A', value: 'description_desc' }
+    ];
+
     // Load reference data once
     useEffect(() => {
-        Promise.all([ProductService.getProductTypes(), ProductService.getBrands()]).then(([types, brands]) => {
+        Promise.all([
+            ProductService.getProductTypes(),
+            ProductService.getBrands(),
+            ProductService.getDiscounts()
+        ]).then(([types, brands, discounts]) => {
             setProductTypes(types);
             setBrands(brands);
+            setDiscounts(discounts);
         });
     }, []);
 
@@ -208,13 +242,15 @@ const ProductsPageInner = () => {
         const filters: ProductFilters = {
             productTypeId: selectedTypeId ?? undefined,
             brandId: selectedBrandId ?? undefined,
-            search: searchQuery
+            search: searchQuery,
+            sortBy: sortKey ? (sortKey.split('_')[0] as 'price' | 'description') : undefined,
+            sortOrder: sortKey ? (sortKey.split('_')[1] as 'asc' | 'desc') : undefined
         };
         ProductService.getProducts(filters).then((data) => {
             setProducts(data);
             setLoading(false);
         });
-    }, [selectedTypeId, selectedBrandId, searchQuery]);
+    }, [selectedTypeId, selectedBrandId, searchQuery, sortKey]);
 
     useEffect(() => {
         fetchProducts();
@@ -224,9 +260,10 @@ const ProductsPageInner = () => {
         setSelectedTypeId(null);
         setSelectedBrandId(null);
         setSearchQuery('');
+        setSortKey(null);
     };
 
-    const hasActiveFilters = selectedTypeId !== null || selectedBrandId !== null || searchQuery !== '';
+    const hasActiveFilters = selectedTypeId !== null || selectedBrandId !== null || searchQuery !== '' || sortKey !== null;
 
     const viewProduct = (product: Product) => {
         setSelectedProduct(product);
@@ -236,13 +273,13 @@ const ProductsPageInner = () => {
     return (
         <div className="grid">
             {/* Header */}
-            <div className="col-12">
-                <div className="card">
+            <div className="col-12 sticky" style={{ top: '5rem', zIndex: 1000 }}>
+                <div className="card shadow-2">
                     <div className="flex align-items-center justify-content-between flex-wrap gap-3">
                         <div>
-                            <h4 className="m-0 text-900 font-bold">Products</h4>
+                            <h4 className="m-0 text-900 font-bold">Productos</h4>
                             <span className="text-500 text-sm">
-                                {loading ? 'Loading…' : `${products.length} active product${products.length !== 1 ? 's' : ''}`}
+                                {loading ? 'Cargando…' : `${products.length} producto${products.length !== 1 ? 's' : ''} activo${products.length !== 1 ? 's' : ''}`}
                             </span>
                         </div>
 
@@ -253,13 +290,20 @@ const ProductsPageInner = () => {
                                 <InputText
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search product name…"
+                                    placeholder="Buscar por nombre…"
                                     className="w-20rem"
                                 />
                             </span>
+                            <Dropdown
+                                value={sortKey}
+                                options={sortOptions}
+                                onChange={(e) => setSortKey(e.value)}
+                                placeholder="Ordenar por…"
+                                className="w-15rem"
+                            />
                             <Button
                                 icon="pi pi-filter"
-                                label="Filters"
+                                label="Filtros"
                                 outlined
                                 badge={hasActiveFilters ? '!' : undefined}
                                 onClick={() => setFilterVisible(true)}
@@ -269,7 +313,7 @@ const ProductsPageInner = () => {
                                     icon="pi pi-times"
                                     outlined
                                     severity="secondary"
-                                    tooltip="Clear all filters"
+                                    tooltip="Limpiar filtros"
                                     tooltipOptions={{ position: 'top' }}
                                     onClick={handleClearFilters}
                                 />
@@ -279,7 +323,7 @@ const ProductsPageInner = () => {
                                 icon="pi pi-shopping-cart"
                                 badge={totalItems > 0 ? String(totalItems) : undefined}
                                 rounded
-                                tooltip="View cart"
+                                tooltip="Ver carrito"
                                 tooltipOptions={{ position: 'top' }}
                                 onClick={() => setCartVisible(true)}
                             />
@@ -308,6 +352,7 @@ const ProductsPageInner = () => {
                                     product={product}
                                     brands={brands}
                                     productTypes={productTypes}
+                                    discounts={discounts}
                                     onView={viewProduct}
                                     onAddToCart={addToCart}
                                 />
