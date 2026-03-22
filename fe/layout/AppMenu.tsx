@@ -17,6 +17,10 @@ const AppMenu = () => {
         {
             label: 'Store',
             items: [{ label: 'Products', icon: 'pi pi-fw pi-shopping-bag', to: '/products' }]
+        },
+        {
+            label: 'Admin',
+            items: [{ label: 'Manage Products', icon: 'pi pi-fw pi-cog', to: '/admin/products' }]
         }
     ];
 
