@@ -24,6 +24,28 @@ interface CartContextValue {
     getTotals: () => CartTotals;
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const CART_STORAGE_KEY = 'xstore-cart';
+
+const saveCartToStorage = (items: CartItem[]): void => {
+    try {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    } catch {
+        // Silently fail if localStorage is unavailable (e.g., private mode)
+    }
+};
+
+const loadCartFromStorage = (): CartItem[] => {
+    try {
+        const raw = localStorage.getItem(CART_STORAGE_KEY);
+        if (!raw) return [];
+        return JSON.parse(raw) as CartItem[];
+    } catch {
+        return [];
+    }
+};
+
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
@@ -31,8 +53,24 @@ const CartContext = createContext<CartContextValue | undefined>(undefined);
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
+    // Start with empty array to avoid SSR/hydration mismatches;
+    // localStorage is only available in the browser.
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [discounts, setDiscounts] = useState<Discount[]>([]);
+    const [hydrated, setHydrated] = useState(false);
+
+    // Hydrate from localStorage once we are on the client
+    useEffect(() => {
+        setCartItems(loadCartFromStorage());
+        setHydrated(true);
+    }, []);
+
+    // Persist to localStorage whenever cartItems change (after initial hydration)
+    useEffect(() => {
+        if (hydrated) {
+            saveCartToStorage(cartItems);
+        }
+    }, [cartItems, hydrated]);
 
     useEffect(() => {
         ProductService.getDiscounts().then(setDiscounts);

@@ -11,7 +11,7 @@ import { ProgressSpinner } from 'primereact/progressspinner';
 import { Tag } from 'primereact/tag';
 
 import { useCart } from '../../../context/CartContext';
-import { Customer, CustomerService } from '../../../service/CustomerService';
+import { AuthService, User } from '../../../service/AuthService';
 import { Discount, ProductService } from '../../../service/ProductService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ const CheckoutPage = () => {
     const { cartItems, clearCart, getTotals } = useCart();
     const { subtotal, total, totalItems } = getTotals();
 
-    const [customer, setCustomer] = useState<Customer | null>(null);
+    const [customer, setCustomer] = useState<User | null>(null);
     const [discounts, setDiscounts] = useState<Discount[]>([]);
 
     // Card form state
@@ -84,15 +84,25 @@ const CheckoutPage = () => {
     const [cvv, setCvv] = useState('');
     const [installments, setInstallments] = useState<number>(0);
 
+    const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+    const [tempCustomer, setTempCustomer] = useState<User | null>(null);
+
     // Process state
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
 
+    // Auth guard: redirect to login if not authenticated
     useEffect(() => {
-        CustomerService.getCustomer().then(setCustomer);
+        if (!AuthService.isAuthenticated()) {
+            router.replace('/auth/login?redirect=/checkout');
+            return;
+        }
+        const currentUser = AuthService.getCurrentUser();
+        setCustomer(currentUser);
+        setTempCustomer(currentUser ? { ...currentUser } : null);
         ProductService.getDiscounts().then(setDiscounts);
-    }, []);
+    }, [router]);
 
     // Redirect if cart is empty (and not yet in success state)
     useEffect(() => {
@@ -130,6 +140,19 @@ const CheckoutPage = () => {
         router.push('/products');
     };
 
+    const handleSaveCustomer = async () => {
+        if (!tempCustomer) return;
+        setIsProcessing(true);
+        const res = await AuthService.updateUser(tempCustomer);
+        setIsProcessing(false);
+        if (res.success) {
+            setCustomer(res.user!);
+            setIsEditingCustomer(false);
+        } else {
+            // Error handling could be added here (e.g., Toast)
+        }
+    };
+
     if (isSuccess) {
         return <SuccessScreen onContinue={handleContinue} />;
     }
@@ -160,30 +183,96 @@ const CheckoutPage = () => {
                 {/* Customer Info */}
                 {customer && (
                     <Card className="shadow-2 mb-3">
-                        <div className="flex align-items-center gap-2 mb-3">
-                            <i className="pi pi-user text-primary" style={{ fontSize: '1.2rem' }} />
-                            <h5 className="m-0 text-900 font-semibold">Información de Contacto y Entrega</h5>
+                        <div className="flex align-items-center justify-content-between mb-3">
+                            <div className="flex align-items-center gap-2">
+                                <i className="pi pi-user text-primary" style={{ fontSize: '1.2rem' }} />
+                                <h5 className="m-0 text-900 font-semibold">Información de Contacto y Entrega</h5>
+                            </div>
+                            {!isEditingCustomer ? (
+                                <Button
+                                    icon="pi pi-pencil"
+                                    label="Editar"
+                                    text
+                                    size="small"
+                                    onClick={() => {
+                                        setTempCustomer({ ...customer });
+                                        setIsEditingCustomer(true);
+                                    }}
+                                />
+                            ) : (
+                                <div className="flex gap-2">
+                                    <Button
+                                        icon="pi pi-times"
+                                        label="Cancelar"
+                                        text
+                                        severity="secondary"
+                                        size="small"
+                                        onClick={() => setIsEditingCustomer(false)}
+                                    />
+                                    <Button
+                                        icon="pi pi-check"
+                                        label="Guardar"
+                                        size="small"
+                                        onClick={handleSaveCustomer}
+                                        loading={isProcessing}
+                                    />
+                                </div>
+                            )}
                         </div>
+
                         <div className="grid">
                             <div className="col-12 sm:col-6">
                                 <span className="text-500 text-xs uppercase font-medium">Nombre</span>
-                                <p className="m-0 text-900 font-medium mt-1">{customer.fullName}</p>
+                                {!isEditingCustomer ? (
+                                    <p className="m-0 text-900 font-medium mt-1">{customer.fullName}</p>
+                                ) : (
+                                    <InputText
+                                        value={tempCustomer?.fullName || ''}
+                                        onChange={(e) => setTempCustomer((p) => p ? ({ ...p, fullName: e.target.value }) : null)}
+                                        className="w-full mt-1 p-inputtext-sm"
+                                    />
+                                )}
                             </div>
                             <div className="col-12 sm:col-6">
                                 <span className="text-500 text-xs uppercase font-medium">Identificación</span>
-                                <p className="m-0 text-900 font-medium mt-1">{customer.identification}</p>
+                                {!isEditingCustomer ? (
+                                    <p className="m-0 text-900 font-medium mt-1">{customer.identification}</p>
+                                ) : (
+                                    <InputText
+                                        value={tempCustomer?.identification || ''}
+                                        onChange={(e) => setTempCustomer((p) => p ? ({ ...p, identification: e.target.value }) : null)}
+                                        className="w-full mt-1 p-inputtext-sm"
+                                    />
+                                )}
                             </div>
                             <div className="col-12 sm:col-6">
                                 <span className="text-500 text-xs uppercase font-medium">Correo</span>
-                                <p className="m-0 text-900 font-medium mt-1">{customer.email}</p>
+                                <p className="m-0 text-600 font-medium mt-1">{customer.email}</p>
+                                {isEditingCustomer && <small className="text-400">El correo no es editable</small>}
                             </div>
                             <div className="col-12 sm:col-6">
                                 <span className="text-500 text-xs uppercase font-medium">Teléfono</span>
-                                <p className="m-0 text-900 font-medium mt-1">{customer.phone}</p>
+                                {!isEditingCustomer ? (
+                                    <p className="m-0 text-900 font-medium mt-1">{customer.phone}</p>
+                                ) : (
+                                    <InputText
+                                        value={tempCustomer?.phone || ''}
+                                        onChange={(e) => setTempCustomer((p) => p ? ({ ...p, phone: e.target.value }) : null)}
+                                        className="w-full mt-1 p-inputtext-sm"
+                                    />
+                                )}
                             </div>
                             <div className="col-12">
                                 <span className="text-500 text-xs uppercase font-medium">Dirección de Entrega</span>
-                                <p className="m-0 text-900 font-medium mt-1">{customer.address}</p>
+                                {!isEditingCustomer ? (
+                                    <p className="m-0 text-900 font-medium mt-1">{customer.address}</p>
+                                ) : (
+                                    <InputText
+                                        value={tempCustomer?.address || ''}
+                                        onChange={(e) => setTempCustomer((p) => p ? ({ ...p, address: e.target.value }) : null)}
+                                        className="w-full mt-1 p-inputtext-sm"
+                                    />
+                                )}
                             </div>
                         </div>
                     </Card>
