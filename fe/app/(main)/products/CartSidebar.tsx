@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from 'primereact/button';
 import { Divider } from 'primereact/divider';
 import { InputNumber } from 'primereact/inputnumber';
@@ -23,6 +24,7 @@ interface CartSidebarProps {
 }
 
 const CartSidebar = ({ visible, onHide }: CartSidebarProps) => {
+    const router = useRouter();
     const { cartItems, removeFromCart, updateQuantity, clearCart, getTotals } = useCart();
     const [discounts, setDiscounts] = React.useState<Discount[]>([]);
 
@@ -161,7 +163,7 @@ const CartSidebar = ({ visible, onHide }: CartSidebarProps) => {
                                 icon="pi pi-credit-card"
                                 className="w-full mb-2"
                                 disabled={isEmpty}
-                                // TODO: connect to checkout flow in a future ticket
+                                onClick={() => { onHide(); router.push('/checkout'); }}
                             />
                             <Button
                                 label="Vaciar Carrito"

@@ -126,12 +126,12 @@ const Layout = ({ children }: ChildContainerProps) => {
         <React.Fragment>
             <div className={containerClass}>
                 <AppTopbar ref={topbarRef} />
-                {pathname !== '/products' && (
+                {pathname !== '/products' && pathname !== '/checkout' && (
                     <div ref={sidebarRef} className="layout-sidebar">
                         <AppSidebar />
                     </div>
                 )}
-                <div className={classNames('layout-main-container', { 'ml-0': pathname === '/products' })}>
+                <div className={classNames('layout-main-container', { 'ml-0': pathname === '/products' || pathname === '/checkout' })}>
                     <div className="layout-main">{children}</div>
                     <AppFooter />
                 </div>
