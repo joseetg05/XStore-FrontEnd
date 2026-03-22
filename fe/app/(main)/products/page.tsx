@@ -9,7 +9,7 @@ import { InputText } from 'primereact/inputtext';
 import { Sidebar } from 'primereact/sidebar';
 import { Tag } from 'primereact/tag';
 
-import { CartProvider, useCart } from '../../../context/CartContext';
+import { useCart } from '../../../context/CartContext';
 import { Brand, Discount, Product, ProductFilters, ProductService, ProductType } from '../../../service/ProductService';
 import CartSidebar from './CartSidebar';
 
@@ -402,12 +402,6 @@ const ProductsPageInner = () => {
     );
 };
 
-// ─── Products Page (wraps with CartProvider) ──────────────────────────────────
+// ─── Products Page ────────────────────────────────────────────────────────────
 
-const ProductsPage = () => (
-    <CartProvider>
-        <ProductsPageInner />
-    </CartProvider>
-);
-
-export default ProductsPage;
+export default ProductsPageInner;

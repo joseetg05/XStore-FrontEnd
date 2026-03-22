@@ -13,7 +13,7 @@ const AppTopbar = forwardRef<AppTopbarRef>((props, ref) => {
     const topbarmenuRef = useRef(null);
     const topbarmenubuttonRef = useRef(null);
     const pathname = usePathname();
-    const isProductsPage = pathname === '/products';
+    const isProductsPage = pathname === '/products' || pathname === '/checkout';
 
     useImperativeHandle(ref, () => ({
         menubutton: menubuttonRef.current,
