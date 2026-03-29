@@ -24,7 +24,8 @@ const AppMenu = () => {
                 { label: 'Manage Products', icon: 'pi pi-fw pi-cog', to: '/admin/products' },
                 { label: 'Tipos de Producto', icon: 'pi pi-fw pi-tags', to: '/admin/product-types' },
                 { label: 'Marcas', icon: 'pi pi-fw pi-bookmark', to: '/admin/brands' },
-                { label: 'Tipos de Descuento', icon: 'pi pi-fw pi-percentage', to: '/admin/discount-types' }
+                { label: 'Tipos de Descuento', icon: 'pi pi-fw pi-percentage', to: '/admin/discount-types' },
+                { label: 'Descuentos', icon: 'pi pi-fw pi-ticket', to: '/admin/discounts' }
             ]
         },
         {
