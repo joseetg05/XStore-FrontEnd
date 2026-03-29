@@ -29,6 +29,7 @@ const AppMenu = () => {
         {
             label: 'Inventario',
             items: [
+                { label: 'Inventario', icon: 'pi pi-fw pi-box', to: '/admin/inventory' },
                 { label: 'Ubicaciones', icon: 'pi pi-fw pi-map-marker', to: '/admin/inventory-locations' }
             ]
         }
