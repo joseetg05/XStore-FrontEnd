@@ -1,2 +1,4 @@
 .agent/
 openspec/
+.claude/
+CLAUDE.md

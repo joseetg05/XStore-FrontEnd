@@ -20,7 +20,10 @@ const AppMenu = () => {
         },
         {
             label: 'Admin',
-            items: [{ label: 'Manage Products', icon: 'pi pi-fw pi-cog', to: '/admin/products' }]
+            items: [
+                { label: 'Manage Products', icon: 'pi pi-fw pi-cog', to: '/admin/products' },
+                { label: 'Tipos de Producto', icon: 'pi pi-fw pi-tags', to: '/admin/product-types' }
+            ]
         }
     ];
 

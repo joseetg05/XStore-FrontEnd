@@ -217,7 +217,13 @@ const saveProducts = (products: Product[]): void => {
 
 export const ProductService = {
     /**
-     * Returns all available product types.
+     * Returns all available product types (hardcoded mock).
+     *
+     * TODO: reemplazar con ProductTypeService.getActiveProductTypes() cuando el módulo
+     * de tipos de producto esté integrado en el formulario de creación/edición de productos.
+     * Ejemplo:
+     *   import { ProductTypeService } from './ProductTypeService'
+     *   return ProductTypeService.getActiveProductTypes()
      */
     getProductTypes(): Promise<ProductType[]> {
         // TODO: habilitar cuando exista backend real
