@@ -232,7 +232,13 @@ export const ProductService = {
     },
 
     /**
-     * Retorna todas las marcas disponibles.
+     * Retorna todas las marcas disponibles (hardcoded mock).
+     *
+     * TODO: reemplazar con BrandService.getActiveBrands() cuando el módulo
+     * de marcas esté integrado en el formulario de creación/edición de productos.
+     * Ejemplo:
+     *   import { BrandService } from './BrandService'
+     *   return BrandService.getActiveBrands()
      */
     getBrands(): Promise<Brand[]> {
         // TODO: habilitar cuando exista backend real
