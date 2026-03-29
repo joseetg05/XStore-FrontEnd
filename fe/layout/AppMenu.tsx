@@ -25,6 +25,12 @@ const AppMenu = () => {
                 { label: 'Tipos de Producto', icon: 'pi pi-fw pi-tags', to: '/admin/product-types' },
                 { label: 'Marcas', icon: 'pi pi-fw pi-bookmark', to: '/admin/brands' }
             ]
+        },
+        {
+            label: 'Inventario',
+            items: [
+                { label: 'Ubicaciones', icon: 'pi pi-fw pi-map-marker', to: '/admin/inventory-locations' }
+            ]
         }
     ];
 
