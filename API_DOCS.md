@@ -667,12 +667,11 @@ Registra una entrada de auditoría. **El frontend debe llamar este endpoint desp
 
 //1. Health — ping de salud de la API  
  //2. Sesiones — login (/verificar) y creación de cuenta  
- 3. Roles — CRUD de roles del sistema  
+ //3. Roles — CRUD de roles del sistema  
  //4. Tipos de Producto — CRUD de tipos/categorías de producto  
  //5. Marcas de Producto — CRUD de marcas  
  //6. Ubicaciones — CRUD de ubicaciones de almacén  
- 7. Tipos de Persona — CRUD de tipos de cliente (con descuento % y monto meta)  
- 8. Personas — consulta y edición de clientes/usuarios  
+ 7. Tipos de Persona — CRUD de tipos de cliente (con descuento % y monto meta) ?? 8. Personas — consulta y edición de clientes/usuarios  
  9. Usuarios — creación de usuario (persona + credenciales en un endpoint)  
  10. Proveedores — CRUD de proveedores + endpoint de nombres para dropdowns  
  //11. Categorías de Descuento — CRUD de categorías de descuento  

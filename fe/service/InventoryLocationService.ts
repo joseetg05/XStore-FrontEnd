@@ -1,4 +1,4 @@
-import { apiCall } from './ApiClient'
+import { apiCall, getCurrentUsername } from './ApiClient'
 import { InventoryLocation, InventoryLocationResult } from '@/types/inventorylocation'
 
 // ─── API shape ────────────────────────────────────────────────────────────────
@@ -18,8 +18,10 @@ const fromApi = (l: ApiLocation, index: number): InventoryLocation => ({
 
 export const InventoryLocationService = {
     async getAll(): Promise<InventoryLocation[]> {
-        const data = await apiCall<ApiLocation[]>('GET', '/api/ubicaciones?nombreUsuario=AskingMansOz')
-        return data.map((l, i) => fromApi(l, i))
+        const u = getCurrentUsername()
+        if (!u) return []
+        const data = await apiCall<ApiLocation[]>('GET', `/api/ubicaciones?nombreUsuario=${u}`)
+        return (data ?? []).map((l, i) => fromApi(l, i))
     },
 
     async getActiveLocations(): Promise<InventoryLocation[]> {
@@ -29,7 +31,7 @@ export const InventoryLocationService = {
 
     async create(data: Omit<InventoryLocation, 'id'>): Promise<InventoryLocationResult> {
         try {
-            await apiCall('POST', '/api/ubicaciones', { nombreUsuario: 'AskingMansOz', nombre: data.name })
+            await apiCall('POST', '/api/ubicaciones', { nombreUsuario: getCurrentUsername(), nombre: data.name })
             return { success: true }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }
@@ -39,7 +41,7 @@ export const InventoryLocationService = {
     async update(originalName: string, location: InventoryLocation): Promise<InventoryLocationResult> {
         try {
             await apiCall('PUT', '/api/ubicaciones', {
-                nombreUsuario: 'AskingMansOz',
+                nombreUsuario: getCurrentUsername(),
                 nombre: originalName,
                 nuevoNombre: location.name,
                 nuevoEstado: location.status
@@ -52,7 +54,7 @@ export const InventoryLocationService = {
 
     async delete(name: string): Promise<{ success: boolean; error?: string }> {
         try {
-            await apiCall('PUT', '/api/ubicaciones', { nombreUsuario: 'AskingMansOz', nombre: name, nuevoEstado: false })
+            await apiCall('PUT', '/api/ubicaciones', { nombreUsuario: getCurrentUsername(), nombre: name, nuevoEstado: false })
             return { success: true }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }
@@ -62,7 +64,7 @@ export const InventoryLocationService = {
     async toggleStatus(name: string, currentStatus: boolean): Promise<InventoryLocationResult> {
         const newStatus = !currentStatus
         try {
-            await apiCall('PUT', '/api/ubicaciones', { nombreUsuario: 'AskingMansOz', nombre: name, nuevoEstado: newStatus })
+            await apiCall('PUT', '/api/ubicaciones', { nombreUsuario: getCurrentUsername(), nombre: name, nuevoEstado: newStatus })
             return { success: true, location: { id: 0, name, status: newStatus } }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }

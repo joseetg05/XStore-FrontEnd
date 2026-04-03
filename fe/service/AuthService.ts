@@ -11,12 +11,10 @@ async function hashPassword(password: string): Promise<string> {
 
 // ─── API shapes ───────────────────────────────────────────────────────────────
 
-interface ApiSessionUser {
-    'Nombre Usuario': string
-    'Nombre Completo': string
-    Correo: string
-    Rol: string
-    Accesos: string
+interface ApiSessionResponse {
+    token: string
+    nombreRol: string
+    accesos: string
 }
 
 interface ApiPersona {
@@ -70,29 +68,28 @@ export interface AuthResult {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const mapApiUser = (raw: ApiSessionUser): User => ({
-    username: raw['Nombre Usuario'],
-    fullName: raw['Nombre Completo'],
-    email: raw.Correo,
-    role: raw.Rol,
-    accesos: raw.Accesos,
-    // Estos campos no vienen en el login — se completan al editar perfil
-    id: 0,
-    identification: '',
-    phone: '',
-    address: ''
-})
+function decodeJwtPayload(token: string): Record<string, string> {
+    try {
+        const payload = token.split('.')[1]
+        const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+        return JSON.parse(decoded)
+    } catch {
+        return {}
+    }
+}
 
-async function fetchPersonaData(username: string, email: string): Promise<Partial<User>> {
+async function fetchPersonaData(username: string): Promise<Partial<User>> {
     try {
         const data = await apiCall<ApiPersona[]>(
             'GET',
-            `/api/personas?nombreUsuario=${encodeURIComponent(username)}&busqueda=${encodeURIComponent(email)}`
+            `/api/personas?nombreUsuario=${encodeURIComponent(username)}`
         )
         if (!data || data.length === 0) return {}
         const p = data[0]
         return {
             id: p.ID,
+            fullName: p['Nombre Completo'],
+            email: p.Correo,
             identification: p['Identificación'],
             phone: p['Teléfono'],
             address: p['Dirección']
@@ -114,15 +111,30 @@ export const AuthService = {
     async login(payload: LoginPayload): Promise<AuthResult> {
         try {
             const passwordHash = await hashPassword(payload.password)
-            const data = await apiCall<ApiSessionUser[]>('POST', '/api/sesiones/verificar', {
+            const data = await apiCall<ApiSessionResponse>('POST', '/api/sesiones/verificar', {
                 nombreUsuario: payload.username,
                 passwordHash
             })
-            if (!data || data.length === 0) {
+            if (!data || !data.token) {
                 return { success: false, error: 'Credenciales incorrectas.' }
             }
-            const base = mapApiUser(data[0])
-            const extra = await fetchPersonaData(payload.username, base.email)
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('xstore-token', data.token)
+            }
+            const claims = decodeJwtPayload(data.token)
+            const username = claims['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] ?? payload.username
+            const base: User = {
+                username,
+                fullName: username,
+                email: '',
+                role: data.nombreRol,
+                accesos: data.accesos,
+                id: 0,
+                identification: '',
+                phone: '',
+                address: ''
+            }
+            const extra = await fetchPersonaData(username)
             const user: User = { ...base, ...extra }
             saveSession(user)
             return { success: true, user }
@@ -184,6 +196,7 @@ export const AuthService = {
     logout(): void {
         if (typeof window !== 'undefined') {
             localStorage.removeItem(STORAGE_KEY)
+            localStorage.removeItem('xstore-token')
         }
     }
 }

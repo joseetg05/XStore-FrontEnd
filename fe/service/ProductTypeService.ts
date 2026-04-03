@@ -1,4 +1,4 @@
-import { apiCall } from './ApiClient'
+import { apiCall, getCurrentUsername } from './ApiClient'
 import { ProductType, ProductTypeResult } from '@/types/producttype'
 
 // ─── API shape ────────────────────────────────────────────────────────────────
@@ -18,8 +18,10 @@ const fromApi = (t: ApiProductType, index: number): ProductType => ({
 
 export const ProductTypeService = {
     async getAll(): Promise<ProductType[]> {
-        const data = await apiCall<ApiProductType[]>('GET', '/api/tipos-productos?nombreUsuario=AskingMansOz')
-        return data.map((t, i) => fromApi(t, i))
+        const u = getCurrentUsername()
+        if (!u) return []
+        const data = await apiCall<ApiProductType[]>('GET', `/api/tipos-productos?nombreUsuario=${u}`)
+        return (data ?? []).map((t, i) => fromApi(t, i))
     },
 
     async getActiveProductTypes(): Promise<ProductType[]> {
@@ -29,7 +31,7 @@ export const ProductTypeService = {
 
     async create(data: Omit<ProductType, 'id'>): Promise<ProductTypeResult> {
         try {
-            await apiCall('POST', '/api/tipos-productos', { nombreUsuario: 'AskingMansOz', nombre: data.name })
+            await apiCall('POST', '/api/tipos-productos', { nombreUsuario: getCurrentUsername(), nombre: data.name })
             return { success: true }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }
@@ -39,7 +41,7 @@ export const ProductTypeService = {
     async update(originalName: string, productType: ProductType): Promise<ProductTypeResult> {
         try {
             await apiCall('PUT', '/api/tipos-productos', {
-                nombreUsuario: 'AskingMansOz',
+                nombreUsuario: getCurrentUsername(),
                 nombre: originalName,
                 nuevoNombre: productType.name,
                 nuevoEstado: productType.status
@@ -52,7 +54,7 @@ export const ProductTypeService = {
 
     async delete(name: string): Promise<{ success: boolean; error?: string }> {
         try {
-            await apiCall('PUT', '/api/tipos-productos', { nombreUsuario: 'AskingMansOz', nombre: name, nuevoEstado: false })
+            await apiCall('PUT', '/api/tipos-productos', { nombreUsuario: getCurrentUsername(), nombre: name, nuevoEstado: false })
             return { success: true }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }
@@ -62,7 +64,7 @@ export const ProductTypeService = {
     async toggleStatus(name: string, currentStatus: boolean): Promise<ProductTypeResult> {
         const newStatus = !currentStatus
         try {
-            await apiCall('PUT', '/api/tipos-productos', { nombreUsuario: 'AskingMansOz', nombre: name, nuevoEstado: newStatus })
+            await apiCall('PUT', '/api/tipos-productos', { nombreUsuario: getCurrentUsername(), nombre: name, nuevoEstado: newStatus })
             return { success: true, productType: { id: 0, name, status: newStatus } }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }
