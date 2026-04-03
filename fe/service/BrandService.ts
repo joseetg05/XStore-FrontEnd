@@ -1,4 +1,4 @@
-import { apiCall } from './ApiClient'
+import { apiCall, getCurrentUsername } from './ApiClient'
 import { Brand, BrandResult } from '@/types/brand'
 
 // ─── API shape ────────────────────────────────────────────────────────────────
@@ -18,8 +18,10 @@ const fromApi = (b: ApiBrand, index: number): Brand => ({
 
 export const BrandService = {
     async getAll(): Promise<Brand[]> {
-        const data = await apiCall<ApiBrand[]>('GET', '/api/marcas-productos?nombreUsuario=AskingMansOz')
-        return data.map((b, i) => fromApi(b, i))
+        const u = getCurrentUsername()
+        if (!u) return []
+        const data = await apiCall<ApiBrand[]>('GET', `/api/marcas-productos?nombreUsuario=${u}`)
+        return (data ?? []).map((b, i) => fromApi(b, i))
     },
 
     async getActiveBrands(): Promise<Brand[]> {
@@ -29,7 +31,7 @@ export const BrandService = {
 
     async create(data: Omit<Brand, 'id'>): Promise<BrandResult> {
         try {
-            await apiCall('POST', '/api/marcas-productos', { nombreUsuario: 'AskingMansOz', nombre: data.name })
+            await apiCall('POST', '/api/marcas-productos', { nombreUsuario: getCurrentUsername(), nombre: data.name })
             return { success: true }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }
@@ -39,7 +41,7 @@ export const BrandService = {
     async update(originalName: string, brand: Brand): Promise<BrandResult> {
         try {
             await apiCall('PUT', '/api/marcas-productos', {
-                nombreUsuario: 'AskingMansOz',
+                nombreUsuario: getCurrentUsername(),
                 nombre: originalName,
                 nuevoNombre: brand.name,
                 nuevoEstado: brand.status
@@ -52,7 +54,7 @@ export const BrandService = {
 
     async delete(name: string): Promise<{ success: boolean; error?: string }> {
         try {
-            await apiCall('PUT', '/api/marcas-productos', { nombreUsuario: 'AskingMansOz', nombre: name, nuevoEstado: false })
+            await apiCall('PUT', '/api/marcas-productos', { nombreUsuario: getCurrentUsername(), nombre: name, nuevoEstado: false })
             return { success: true }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }
@@ -62,7 +64,7 @@ export const BrandService = {
     async toggleStatus(name: string, currentStatus: boolean): Promise<BrandResult> {
         const newStatus = !currentStatus
         try {
-            await apiCall('PUT', '/api/marcas-productos', { nombreUsuario: 'AskingMansOz', nombre: name, nuevoEstado: newStatus })
+            await apiCall('PUT', '/api/marcas-productos', { nombreUsuario: getCurrentUsername(), nombre: name, nuevoEstado: newStatus })
             return { success: true, brand: { id: 0, name, status: newStatus } }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }

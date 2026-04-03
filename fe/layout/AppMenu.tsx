@@ -1,31 +1,45 @@
 /* eslint-disable @next/next/no-img-element */
 
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import AppMenuitem from './AppMenuitem';
 import { LayoutContext } from './context/layoutcontext';
 import { MenuProvider } from './context/menucontext';
 import { AppMenuItem } from '@/types';
+import { AuthService } from '@/service/AuthService';
 
 const AppMenu = () => {
     const { layoutConfig } = useContext(LayoutContext);
 
-    const model: AppMenuItem[] = [
+    const [accesos, setAccesos] = useState<string[] | null>(null);
+
+    useEffect(() => {
+        const user = AuthService.getCurrentUser();
+        setAccesos(user?.accesos ? user.accesos.split(',').map((r) => r.trim()) : null);
+    }, []);
+
+    const filterItems = (items: AppMenuItem[]): AppMenuItem[] => {
+        if (!accesos) return items;
+        return items.filter((item) => !item.to || accesos.includes(item.to));
+    };
+
+    const rawModel: AppMenuItem[] = [
         {
             label: 'Home',
             items: [{ label: 'Dashboard', icon: 'pi pi-fw pi-home', to: '/' }]
         },
         {
             label: 'Store',
-            items: [{ label: 'Products', icon: 'pi pi-fw pi-shopping-bag', to: '/products' }]
+            items: [{ label: 'Tienda', icon: 'pi pi-fw pi-shopping-bag', to: '/products' }]
         },
         {
             label: 'Admin',
             items: [
-                { label: 'Manage Products', icon: 'pi pi-fw pi-cog', to: '/admin/products' },
+                { label: 'Gestión de Productos', icon: 'pi pi-fw pi-cog', to: '/admin/products' },
                 { label: 'Tipos de Producto', icon: 'pi pi-fw pi-tags', to: '/admin/product-types' },
                 { label: 'Marcas', icon: 'pi pi-fw pi-bookmark', to: '/admin/brands' },
                 { label: 'Tipos de Descuento', icon: 'pi pi-fw pi-percentage', to: '/admin/discount-types' },
-                { label: 'Descuentos', icon: 'pi pi-fw pi-ticket', to: '/admin/discounts' }
+                { label: 'Descuentos', icon: 'pi pi-fw pi-ticket', to: '/admin/discounts' },
+                { label: 'Roles', icon: 'pi pi-fw pi-users', to: '/admin/roles' }
             ]
         },
         {
@@ -36,6 +50,10 @@ const AppMenu = () => {
             ]
         }
     ];
+
+    const model = rawModel
+        .map((group) => ({ ...group, items: filterItems(group.items ?? []) }))
+        .filter((group) => (group.items ?? []).length > 0);
 
     return (
         <MenuProvider>

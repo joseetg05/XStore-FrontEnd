@@ -11,17 +11,35 @@ export interface ApiResponse<T = unknown> {
 // ─── Base client ──────────────────────────────────────────────────────────────
 
 export async function apiCall<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
-    const options: RequestInit = {
-        method,
-        headers: { 'Content-Type': 'application/json' }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('xstore-token')
+        if (token) headers['Authorization'] = `Bearer ${token}`
     }
+    const options: RequestInit = { method, headers }
     if (body !== undefined) options.body = JSON.stringify(body)
 
     const res = await fetch(`${API_BASE}${path}`, options)
-    const json: ApiResponse<T> = await res.json()
+
+    const text = await res.text()
+    if (!text) return null as T
+
+    const json: ApiResponse<T> = JSON.parse(text)
 
     if (!json.success) throw new Error(json.message)
     return json.data as T
+}
+
+// ─── Session username ─────────────────────────────────────────────────────────
+
+export function getCurrentUsername(): string {
+    if (typeof window === 'undefined') return ''
+    try {
+        const session = localStorage.getItem('xstore-session')
+        return session ? (JSON.parse(session)?.username ?? '') : ''
+    } catch {
+        return ''
+    }
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────
