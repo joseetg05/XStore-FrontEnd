@@ -13,6 +13,7 @@ import { AuthService, RegisterPayload } from '@/service/AuthService';
 
 const RegisterPage = () => {
     const [form, setForm] = useState<Omit<RegisterPayload, ''>>({
+        username: '',
         identification: '',
         fullName: '',
         phone: '',
@@ -37,6 +38,8 @@ const RegisterPage = () => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
     const validate = (): string | null => {
+        if (!form.username.trim()) return 'El nombre de usuario es requerido.';
+        if (!/^[a-zA-Z0-9_.-]+$/.test(form.username)) return 'El usuario solo puede contener letras, números, puntos, guiones y guiones bajos.';
         if (!form.identification.trim()) return 'La identificación es requerida.';
         if (!form.fullName.trim()) return 'El nombre completo es requerido.';
         if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
@@ -90,6 +93,19 @@ const RegisterPage = () => {
 
                         {/* Form */}
                         <div className="grid">
+                            <div className="col-12">
+                                <label htmlFor="reg-username" className="block text-900 font-medium mb-2">Nombre de Usuario</label>
+                                <InputText
+                                    id="reg-username"
+                                    value={form.username}
+                                    onChange={setField('username')}
+                                    placeholder="ej: juan.perez"
+                                    className="w-full"
+                                    style={{ padding: '0.75rem' }}
+                                    autoComplete="username"
+                                />
+                            </div>
+
                             <div className="col-12 sm:col-6">
                                 <label htmlFor="reg-identification" className="block text-900 font-medium mb-2">Identificación</label>
                                 <InputText

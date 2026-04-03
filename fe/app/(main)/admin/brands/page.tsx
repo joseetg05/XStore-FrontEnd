@@ -28,6 +28,7 @@ const AdminBrandsPage = () => {
     const [globalFilter, setGlobalFilter] = useState('')
     const toast = useRef<Toast>(null)
     const dt = useRef<DataTable<Brand[]>>(null)
+    const originalName = useRef<string>('')
 
     useEffect(() => {
         loadData()
@@ -61,7 +62,7 @@ const AdminBrandsPage = () => {
 
         let result
         if (brand.id) {
-            result = await BrandService.update(brand as Brand)
+            result = await BrandService.update(originalName.current, brand as Brand)
             if (result.success) {
                 toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Marca actualizada correctamente', life: 3000 })
             } else {
@@ -84,6 +85,7 @@ const AdminBrandsPage = () => {
     }
 
     const editBrand = (b: Brand) => {
+        originalName.current = b.name
         setBrand({ ...b })
         setSubmitted(false)
         setBrandDialog(true)
@@ -95,8 +97,8 @@ const AdminBrandsPage = () => {
     }
 
     const deleteBrand = async () => {
-        if (!brand.id) return
-        const res = await BrandService.delete(brand.id)
+        if (!brand.name) return
+        const res = await BrandService.delete(brand.name)
         if (res.success) {
             toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Marca eliminada correctamente', life: 3000 })
             loadData()
@@ -108,7 +110,7 @@ const AdminBrandsPage = () => {
     }
 
     const toggleStatus = async (b: Brand) => {
-        const res = await BrandService.toggleStatus(b.id)
+        const res = await BrandService.toggleStatus(b.name, b.status)
         if (res.success) {
             toast.current?.show({ severity: 'info', summary: 'Estado actualizado', detail: `"${b.name}" ahora está ${res.brand?.status ? 'activa' : 'inactiva'}`, life: 2500 })
             loadData()
@@ -187,7 +189,6 @@ const AdminBrandsPage = () => {
                         header={header}
                         responsiveLayout="scroll"
                     >
-                        <Column field="id" header="ID" sortable headerStyle={{ minWidth: '5rem' }} />
                         <Column field="name" header="Nombre" sortable headerStyle={{ minWidth: '15rem' }} />
                         <Column field="status" header="Activa" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '8rem' }} />
                         <Column body={actionBodyTemplate} headerStyle={{ minWidth: '10rem' }} />

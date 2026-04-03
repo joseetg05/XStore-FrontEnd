@@ -1,226 +1,189 @@
-// ─── Interfaces ───────────────────────────────────────────────────────────────
+import { apiCall } from './ApiClient'
 
-/**
- * Maps to the backend table columns:
- * PER_ID, PER_Identificacion, PER_NombreCompleto, PER_Telefono,
- * PER_Correo, PER_Direccion, PER_FechaRegistro, FK PER_TIPO_PER_ID, PER_Estado
- */
-export interface User {
-    id: number;
-    identification: string;
-    fullName: string;
-    phone: string;
-    email: string;
-    address: string;
-    registrationDate: string;
-    personTypeId: number;
-    status: boolean;
-    /** Only used to simulate login validation — never sent to a real backend in plaintext */
-    password?: string;
+// ─── SHA-256 ──────────────────────────────────────────────────────────────────
+
+async function hashPassword(password: string): Promise<string> {
+    const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
+    return Array.from(new Uint8Array(buffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
 }
 
-const STORAGE_KEY = 'xstore-session';
+// ─── API shapes ───────────────────────────────────────────────────────────────
 
-// ─── Mock Seed Users ──────────────────────────────────────────────────────────
+interface ApiSessionUser {
+    'Nombre Usuario': string
+    'Nombre Completo': string
+    Correo: string
+    Rol: string
+    Accesos: string
+}
 
-const MOCK_USERS: User[] = [
-    {
-        id: 1,
-        identification: '1-0234-0567',
-        fullName: 'José Alberto Torres Ramírez',
-        phone: '+506 8888-1234',
-        email: 'jose@xstore.cr',
-        address: 'San José, Escazú, Trejos Montealegre, residencial Las Palmas #24',
-        registrationDate: '2024-01-15T08:00:00Z',
-        personTypeId: 1,
-        status: true,
-        password: '1234'
-    }
-];
+interface ApiPersona {
+    ID: number
+    'Nombre Completo': string
+    'Identificación': string
+    'Teléfono': string
+    Correo: string
+    'Dirección': string
+}
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Domain types ─────────────────────────────────────────────────────────────
 
-const loadUsers = (): User[] => {
-    try {
-        const raw = typeof window !== 'undefined' ? localStorage.getItem('xstore-users') : null;
-        if (!raw) return MOCK_USERS;
-        const parsed: User[] = JSON.parse(raw);
-        // Merge seed users in case localStorage was cleared of them
-        const ids = new Set(parsed.map((u) => u.email));
-        for (const seed of MOCK_USERS) {
-            if (!ids.has(seed.email)) parsed.push(seed);
-        }
-        return parsed;
-    } catch {
-        return MOCK_USERS;
-    }
-};
+export interface User {
+    username: string
+    fullName: string
+    email: string
+    role: string
+    accesos: string
+    // Campos editables en checkout — se actualizan con PUT /api/personas
+    id: number
+    identification: string
+    phone: string
+    address: string
+}
 
-const saveUsers = (users: User[]): void => {
-    if (typeof window !== 'undefined') {
-        localStorage.setItem('xstore-users', JSON.stringify(users));
-    }
-};
+const STORAGE_KEY = 'xstore-session'
 
-// ─── AuthService ──────────────────────────────────────────────────────────────
+// ─── Payloads ─────────────────────────────────────────────────────────────────
 
 export interface LoginPayload {
-    email: string;
-    password: string;
+    username: string
+    password: string
 }
 
 export interface RegisterPayload {
-    identification: string;
-    fullName: string;
-    phone: string;
-    email: string;
-    address: string;
-    password: string;
+    username: string
+    identification: string
+    fullName: string
+    phone: string
+    email: string
+    address: string
+    password: string
 }
 
 export interface AuthResult {
-    success: boolean;
-    user?: User;
-    error?: string;
+    success: boolean
+    user?: User
+    error?: string
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const mapApiUser = (raw: ApiSessionUser): User => ({
+    username: raw['Nombre Usuario'],
+    fullName: raw['Nombre Completo'],
+    email: raw.Correo,
+    role: raw.Rol,
+    accesos: raw.Accesos,
+    // Estos campos no vienen en el login — se completan al editar perfil
+    id: 0,
+    identification: '',
+    phone: '',
+    address: ''
+})
+
+async function fetchPersonaData(username: string, email: string): Promise<Partial<User>> {
+    try {
+        const data = await apiCall<ApiPersona[]>(
+            'GET',
+            `/api/personas?nombreUsuario=${encodeURIComponent(username)}&busqueda=${encodeURIComponent(email)}`
+        )
+        if (!data || data.length === 0) return {}
+        const p = data[0]
+        return {
+            id: p.ID,
+            identification: p['Identificación'],
+            phone: p['Teléfono'],
+            address: p['Dirección']
+        }
+    } catch {
+        return {}
+    }
+}
+
+const saveSession = (user: User): void => {
+    if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
+    }
+}
+
+// ─── AuthService ──────────────────────────────────────────────────────────────
+
 export const AuthService = {
-    /**
-     * Validates credentials against mock user list.
-     *
-     * TODO: habilitar cuando exista backend real
-     * const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-     *   method: 'POST',
-     *   headers: { 'Content-Type': 'application/json' },
-     *   body: JSON.stringify(payload)
-     * });
-     * const data = await response.json();
-     * if (!response.ok) return { success: false, error: data.message };
-     * localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
-     * return { success: true, user: data.user };
-     */
-    login(payload: LoginPayload): Promise<AuthResult> {
-        const users = loadUsers();
-        const user = users.find(
-            (u) => u.email.toLowerCase() === payload.email.toLowerCase() && u.password === payload.password
-        );
-        if (!user) {
-            return Promise.resolve({ success: false, error: 'Correo o contraseña incorrectos.' });
+    async login(payload: LoginPayload): Promise<AuthResult> {
+        try {
+            const passwordHash = await hashPassword(payload.password)
+            const data = await apiCall<ApiSessionUser[]>('POST', '/api/sesiones/verificar', {
+                nombreUsuario: payload.username,
+                passwordHash
+            })
+            if (!data || data.length === 0) {
+                return { success: false, error: 'Credenciales incorrectas.' }
+            }
+            const base = mapApiUser(data[0])
+            const extra = await fetchPersonaData(payload.username, base.email)
+            const user: User = { ...base, ...extra }
+            saveSession(user)
+            return { success: true, user }
+        } catch (e: unknown) {
+            return { success: false, error: (e as Error).message }
         }
-        const { password, ...safeUser } = user;
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(safeUser));
-        }
-        return Promise.resolve({ success: true, user: safeUser });
     },
 
-    /**
-     * Creates a new mock user account and auto-authenticates them.
-     *
-     * TODO: habilitar cuando exista backend real
-     * const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
-     *   method: 'POST',
-     *   headers: { 'Content-Type': 'application/json' },
-     *   body: JSON.stringify(payload)
-     * });
-     * const data = await response.json();
-     * if (!response.ok) return { success: false, error: data.message };
-     * localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
-     * return { success: true, user: data.user };
-     */
-    register(payload: RegisterPayload): Promise<AuthResult> {
-        const users = loadUsers();
-        const exists = users.find((u) => u.email.toLowerCase() === payload.email.toLowerCase());
-        if (exists) {
-            return Promise.resolve({ success: false, error: 'Ya existe una cuenta con ese correo.' });
+    async register(payload: RegisterPayload): Promise<AuthResult> {
+        try {
+            const passwordHash = await hashPassword(payload.password)
+            await apiCall('POST', '/api/usuarios', {
+                nombreUsuario: null,
+                identificacion: payload.identification,
+                nombreCompleto: payload.fullName,
+                telefono: payload.phone,
+                correo: payload.email,
+                direccion: payload.address,
+                newUser: payload.username,
+                passwordHash,
+                nombreRol: 'Cliente',
+                esProveedor: false
+            })
+            const loginResult = await AuthService.login({ username: payload.username, password: payload.password })
+            if (loginResult.success && loginResult.user) {
+                const enriched: User = {
+                    ...loginResult.user,
+                    identification: payload.identification,
+                    phone: payload.phone,
+                    address: payload.address
+                }
+                saveSession(enriched)
+                return { success: true, user: enriched }
+            }
+            return loginResult
+        } catch (e: unknown) {
+            return { success: false, error: (e as Error).message }
         }
-        const newUser: User = {
-            id: Date.now(),
-            identification: payload.identification,
-            fullName: payload.fullName,
-            phone: payload.phone,
-            email: payload.email,
-            address: payload.address,
-            registrationDate: new Date().toISOString(),
-            personTypeId: 1,
-            status: true,
-            password: payload.password
-        };
-        users.push(newUser);
-        saveUsers(users);
-        const { password, ...safeUser } = newUser;
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(safeUser));
-        }
-        return Promise.resolve({ success: true, user: safeUser });
     },
 
-    /**
-     * Returns the currently authenticated user from localStorage, or null.
-     */
+    updateUser(updatedUser: User): AuthResult {
+        saveSession(updatedUser)
+        return { success: true, user: updatedUser }
+    },
+
     getCurrentUser(): User | null {
         try {
-            const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-            return raw ? (JSON.parse(raw) as User) : null;
+            const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
+            return raw ? (JSON.parse(raw) as User) : null
         } catch {
-            return null;
+            return null
         }
     },
 
-    /**
-     * Returns true if a session is active.
-     */
     isAuthenticated(): boolean {
-        return AuthService.getCurrentUser() !== null;
+        return AuthService.getCurrentUser() !== null
     },
 
-    /**
-     * Updates an existing mock user's information.
-     *
-     * TODO: habilitar cuando exista backend real
-     * const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/${user.id}`, {
-     *   method: 'PUT',
-     *   headers: { 'Content-Type': 'application/json' },
-     *   body: JSON.stringify(user)
-     * });
-     * const data = await response.json();
-     * if (!response.ok) return { success: false, error: data.message };
-     * localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
-     * return { success: true, user: data.user };
-     */
-    updateUser(updatedUser: User): Promise<AuthResult> {
-        const users = loadUsers();
-        const index = users.findIndex((u) => u.id === updatedUser.id);
-        if (index === -1) {
-            return Promise.resolve({ success: false, error: 'Usuario no encontrado.' });
-        }
-        
-        // Preserve password if not provided in updatedUser
-        const currentPassword = users[index].password;
-        users[index] = { ...updatedUser, password: updatedUser.password || currentPassword };
-        
-        saveUsers(users);
-        
-        if (typeof window !== 'undefined') {
-            const currentSession = AuthService.getCurrentUser();
-            if (currentSession && currentSession.id === updatedUser.id) {
-                const { password, ...safeUser } = users[index];
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(safeUser));
-            }
-        }
-        
-        return Promise.resolve({ success: true, user: updatedUser });
-    },
-
-    /**
-     * Clears the current session.
-     *
-     * TODO: habilitar cuando exista backend real
-     * await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, { method: 'POST' });
-     */
     logout(): void {
         if (typeof window !== 'undefined') {
-            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(STORAGE_KEY)
         }
     }
-};
+}

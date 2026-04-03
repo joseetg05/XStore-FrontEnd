@@ -12,7 +12,7 @@ import { LayoutContext } from '@/layout/context/layoutcontext';
 import { AuthService } from '@/service/AuthService';
 
 const LoginPage = () => {
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -28,12 +28,12 @@ const LoginPage = () => {
 
     const handleLogin = async () => {
         setError('');
-        if (!email.trim() || !password) {
-            setError('Por favor ingresá tu correo y contraseña.');
+        if (!username.trim() || !password) {
+            setError('Por favor ingresá tu usuario y contraseña.');
             return;
         }
         setLoading(true);
-        const result = await AuthService.login({ email: email.trim(), password });
+        const result = await AuthService.login({ username: username.trim(), password });
         setLoading(false);
         if (!result.success) {
             setError(result.error ?? 'Error al iniciar sesión.');
@@ -74,18 +74,17 @@ const LoginPage = () => {
 
                         {/* Form */}
                         <div onKeyDown={handleKeyDown}>
-                            <label htmlFor="login-email" className="block text-900 text-xl font-medium mb-2">
-                                Correo Electrónico
+                            <label htmlFor="login-username" className="block text-900 text-xl font-medium mb-2">
+                                Usuario
                             </label>
                             <InputText
-                                id="login-email"
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="correo@ejemplo.com"
+                                id="login-username"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder="Nombre de usuario"
                                 className="w-full mb-5"
                                 style={{ padding: '1rem' }}
-                                autoComplete="email"
+                                autoComplete="username"
                             />
 
                             <label htmlFor="login-password" className="block text-900 font-medium text-xl mb-2">

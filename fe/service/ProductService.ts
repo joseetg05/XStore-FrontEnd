@@ -1,3 +1,6 @@
+import { BrandService } from './BrandService'
+import { ProductTypeService } from './ProductTypeService'
+
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 export interface ProductType {
@@ -216,34 +219,12 @@ const saveProducts = (products: Product[]): void => {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const ProductService = {
-    /**
-     * Returns all available product types (hardcoded mock).
-     *
-     * TODO: reemplazar con ProductTypeService.getActiveProductTypes() cuando el módulo
-     * de tipos de producto esté integrado en el formulario de creación/edición de productos.
-     * Ejemplo:
-     *   import { ProductTypeService } from './ProductTypeService'
-     *   return ProductTypeService.getActiveProductTypes()
-     */
     getProductTypes(): Promise<ProductType[]> {
-        // TODO: habilitar cuando exista backend real
-        // return fetch(`${process.env.NEXT_PUBLIC_API_URL}/product-types`).then(r => r.json());
-        return Promise.resolve(MOCK_PRODUCT_TYPES);
+        return ProductTypeService.getActiveProductTypes()
     },
 
-    /**
-     * Retorna todas las marcas disponibles (hardcoded mock).
-     *
-     * TODO: reemplazar con BrandService.getActiveBrands() cuando el módulo
-     * de marcas esté integrado en el formulario de creación/edición de productos.
-     * Ejemplo:
-     *   import { BrandService } from './BrandService'
-     *   return BrandService.getActiveBrands()
-     */
     getBrands(): Promise<Brand[]> {
-        // TODO: habilitar cuando exista backend real
-        // return fetch(`${process.env.NEXT_PUBLIC_API_URL}/brands`).then(r => r.json());
-        return Promise.resolve(MOCK_BRANDS);
+        return BrandService.getActiveBrands()
     },
 
     /**

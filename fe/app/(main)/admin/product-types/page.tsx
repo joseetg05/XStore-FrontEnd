@@ -28,6 +28,7 @@ const AdminProductTypesPage = () => {
     const [globalFilter, setGlobalFilter] = useState('')
     const toast = useRef<Toast>(null)
     const dt = useRef<DataTable<ProductType[]>>(null)
+    const originalName = useRef<string>('')
 
     useEffect(() => {
         loadData()
@@ -61,7 +62,7 @@ const AdminProductTypesPage = () => {
 
         let result
         if (productType.id) {
-            result = await ProductTypeService.update(productType as ProductType)
+            result = await ProductTypeService.update(originalName.current, productType as ProductType)
             if (result.success) {
                 toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Tipo actualizado correctamente', life: 3000 })
             } else {
@@ -84,6 +85,7 @@ const AdminProductTypesPage = () => {
     }
 
     const editProductType = (pt: ProductType) => {
+        originalName.current = pt.name
         setProductType({ ...pt })
         setSubmitted(false)
         setTypeDialog(true)
@@ -95,8 +97,8 @@ const AdminProductTypesPage = () => {
     }
 
     const deleteProductType = async () => {
-        if (!productType.id) return
-        const res = await ProductTypeService.delete(productType.id)
+        if (!productType.name) return
+        const res = await ProductTypeService.delete(productType.name)
         if (res.success) {
             toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Tipo eliminado correctamente', life: 3000 })
             loadData()
@@ -108,7 +110,7 @@ const AdminProductTypesPage = () => {
     }
 
     const toggleStatus = async (pt: ProductType) => {
-        const res = await ProductTypeService.toggleStatus(pt.id)
+        const res = await ProductTypeService.toggleStatus(pt.name, pt.status)
         if (res.success) {
             toast.current?.show({ severity: 'info', summary: 'Estado actualizado', detail: `"${pt.name}" ahora está ${res.productType?.status ? 'activo' : 'inactivo'}`, life: 2500 })
             loadData()
@@ -187,7 +189,6 @@ const AdminProductTypesPage = () => {
                         header={header}
                         responsiveLayout="scroll"
                     >
-                        <Column field="id" header="ID" sortable headerStyle={{ minWidth: '5rem' }} />
                         <Column field="name" header="Nombre" sortable headerStyle={{ minWidth: '15rem' }} />
                         <Column field="status" header="Activo" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '8rem' }} />
                         <Column body={actionBodyTemplate} headerStyle={{ minWidth: '10rem' }} />

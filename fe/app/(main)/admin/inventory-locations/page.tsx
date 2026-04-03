@@ -28,6 +28,7 @@ const AdminInventoryLocationsPage = () => {
     const [globalFilter, setGlobalFilter] = useState('')
     const toast = useRef<Toast>(null)
     const dt = useRef<DataTable<InventoryLocation[]>>(null)
+    const originalName = useRef<string>('')
 
     useEffect(() => {
         loadData()
@@ -61,7 +62,7 @@ const AdminInventoryLocationsPage = () => {
 
         let result
         if (location.id) {
-            result = await InventoryLocationService.update(location as InventoryLocation)
+            result = await InventoryLocationService.update(originalName.current, location as InventoryLocation)
             if (result.success) {
                 toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Ubicación actualizada correctamente', life: 3000 })
             } else {
@@ -84,6 +85,7 @@ const AdminInventoryLocationsPage = () => {
     }
 
     const editLocation = (loc: InventoryLocation) => {
+        originalName.current = loc.name
         setLocation({ ...loc })
         setSubmitted(false)
         setLocationDialog(true)
@@ -95,8 +97,8 @@ const AdminInventoryLocationsPage = () => {
     }
 
     const deleteLocation = async () => {
-        if (!location.id) return
-        const res = await InventoryLocationService.delete(location.id)
+        if (!location.name) return
+        const res = await InventoryLocationService.delete(location.name)
         if (res.success) {
             toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Ubicación eliminada correctamente', life: 3000 })
             loadData()
@@ -108,7 +110,7 @@ const AdminInventoryLocationsPage = () => {
     }
 
     const toggleStatus = async (loc: InventoryLocation) => {
-        const res = await InventoryLocationService.toggleStatus(loc.id)
+        const res = await InventoryLocationService.toggleStatus(loc.name, loc.status)
         if (res.success) {
             toast.current?.show({ severity: 'info', summary: 'Estado actualizado', detail: `"${loc.name}" ahora está ${res.location?.status ? 'activa' : 'inactiva'}`, life: 2500 })
             loadData()
@@ -187,7 +189,6 @@ const AdminInventoryLocationsPage = () => {
                         header={header}
                         responsiveLayout="scroll"
                     >
-                        <Column field="id" header="ID" sortable headerStyle={{ minWidth: '5rem' }} />
                         <Column field="name" header="Nombre" sortable headerStyle={{ minWidth: '15rem' }} />
                         <Column field="status" header="Activa" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '8rem' }} />
                         <Column body={actionBodyTemplate} headerStyle={{ minWidth: '10rem' }} />

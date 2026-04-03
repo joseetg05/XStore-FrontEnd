@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { Button } from 'primereact/button'
-import { Calendar } from 'primereact/calendar'
 import { Column } from 'primereact/column'
 import { DataTable } from 'primereact/datatable'
 import { Dialog } from 'primereact/dialog'
@@ -15,27 +14,21 @@ import { classNames } from 'primereact/utils'
 import { DiscountType } from '@/types/discounttype'
 import { DiscountTypeService } from '@/service/DiscountTypeService'
 
-const emptyDiscountType = (): Omit<DiscountType, 'id'> => ({
+const emptyDiscountType: Omit<DiscountType, 'id'> = {
     name: '',
-    startDate: new Date(),
-    endDate: new Date(),
     status: true
-})
-
-const formatDate = (date: Date) =>
-    date instanceof Date && !isNaN(date.getTime())
-        ? date.toLocaleDateString('es-CR')
-        : '—'
+}
 
 const AdminDiscountTypesPage = () => {
     const [discountTypes, setDiscountTypes] = useState<DiscountType[]>([])
     const [typeDialog, setTypeDialog] = useState(false)
     const [deleteDialog, setDeleteDialog] = useState(false)
-    const [discountType, setDiscountType] = useState<Partial<DiscountType>>(emptyDiscountType())
+    const [discountType, setDiscountType] = useState<Partial<DiscountType>>(emptyDiscountType)
     const [submitted, setSubmitted] = useState(false)
     const [globalFilter, setGlobalFilter] = useState('')
     const toast = useRef<Toast>(null)
     const dt = useRef<DataTable<DiscountType[]>>(null)
+    const originalName = useRef<string>('')
 
     useEffect(() => {
         loadData()
@@ -45,25 +38,10 @@ const AdminDiscountTypesPage = () => {
         DiscountTypeService.getAll().then((data) => setDiscountTypes(data))
     }
 
-    // ─── Validation ────────────────────────────────────────────────────────────
-
-    const isDateRangeValid = () => {
-        if (!discountType.startDate || !discountType.endDate) return false
-        return discountType.endDate >= discountType.startDate
-    }
-
-    const hasValidationErrors = () => {
-        if (!discountType.name?.trim()) return true
-        if (!discountType.startDate) return true
-        if (!discountType.endDate) return true
-        if (!isDateRangeValid()) return true
-        return false
-    }
-
     // ─── CRUD Actions ──────────────────────────────────────────────────────────
 
     const openNew = () => {
-        setDiscountType(emptyDiscountType())
+        setDiscountType(emptyDiscountType)
         setSubmitted(false)
         setTypeDialog(true)
     }
@@ -79,13 +57,13 @@ const AdminDiscountTypesPage = () => {
 
     const saveDiscountType = async () => {
         setSubmitted(true)
-        if (hasValidationErrors()) return
+        if (!discountType.name?.trim()) return
 
         let result
         if (discountType.id) {
-            result = await DiscountTypeService.update(discountType as DiscountType)
+            result = await DiscountTypeService.update(originalName.current, discountType as DiscountType)
             if (result.success) {
-                toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Tipo de descuento actualizado', life: 3000 })
+                toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Categoría actualizada correctamente', life: 3000 })
             } else {
                 toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error, life: 3000 })
                 return
@@ -93,7 +71,7 @@ const AdminDiscountTypesPage = () => {
         } else {
             result = await DiscountTypeService.create(discountType as Omit<DiscountType, 'id'>)
             if (result.success) {
-                toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Tipo de descuento creado', life: 3000 })
+                toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Categoría creada correctamente', life: 3000 })
             } else {
                 toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error, life: 3000 })
                 return
@@ -101,38 +79,39 @@ const AdminDiscountTypesPage = () => {
         }
 
         setTypeDialog(false)
-        setDiscountType(emptyDiscountType())
+        setDiscountType(emptyDiscountType)
         loadData()
     }
 
-    const editDiscountType = (dt: DiscountType) => {
-        setDiscountType({ ...dt })
+    const editDiscountType = (d: DiscountType) => {
+        originalName.current = d.name
+        setDiscountType({ ...d })
         setSubmitted(false)
         setTypeDialog(true)
     }
 
-    const confirmDelete = (dt: DiscountType) => {
-        setDiscountType({ ...dt })
+    const confirmDelete = (d: DiscountType) => {
+        setDiscountType({ ...d })
         setDeleteDialog(true)
     }
 
     const deleteDiscountType = async () => {
-        if (!discountType.id) return
-        const res = await DiscountTypeService.delete(discountType.id)
+        if (!discountType.name) return
+        const res = await DiscountTypeService.delete(discountType.name)
         if (res.success) {
-            toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Tipo de descuento eliminado', life: 3000 })
+            toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Categoría eliminada correctamente', life: 3000 })
             loadData()
         } else {
             toast.current?.show({ severity: 'error', summary: 'Error', detail: res.error, life: 3000 })
         }
         setDeleteDialog(false)
-        setDiscountType(emptyDiscountType())
+        setDiscountType(emptyDiscountType)
     }
 
-    const toggleStatus = async (dt: DiscountType) => {
-        const res = await DiscountTypeService.toggleStatus(dt.id)
+    const toggleStatus = async (d: DiscountType) => {
+        const res = await DiscountTypeService.toggleStatus(d.name, d.status)
         if (res.success) {
-            toast.current?.show({ severity: 'info', summary: 'Estado actualizado', detail: `"${dt.name}" ahora está ${res.discountType?.status ? 'activo' : 'inactivo'}`, life: 2500 })
+            toast.current?.show({ severity: 'info', summary: 'Estado actualizado', detail: `"${d.name}" ahora está ${res.discountType?.status ? 'activa' : 'inactiva'}`, life: 2500 })
             loadData()
         } else {
             toast.current?.show({ severity: 'error', summary: 'Error', detail: res.error, life: 3000 })
@@ -140,9 +119,6 @@ const AdminDiscountTypesPage = () => {
     }
 
     // ─── Column Templates ──────────────────────────────────────────────────────
-
-    const startDateBodyTemplate = (rowData: DiscountType) => formatDate(rowData.startDate)
-    const endDateBodyTemplate = (rowData: DiscountType) => formatDate(rowData.endDate)
 
     const statusBodyTemplate = (rowData: DiscountType) => (
         <InputSwitch checked={rowData.status} onChange={() => toggleStatus(rowData)} />
@@ -157,13 +133,13 @@ const AdminDiscountTypesPage = () => {
 
     const leftToolbarTemplate = () => (
         <div className="my-2">
-            <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />
+            <Button label="Nueva" icon="pi pi-plus" severity="success" onClick={openNew} />
         </div>
     )
 
     const header = (
         <div className="flex flex-column md:flex-row md:justify-content-between md:align-items-center">
-            <h5 className="m-0">Gestión de Tipos de Descuento</h5>
+            <h5 className="m-0">Gestión de Categorías de Descuento</h5>
             <span className="block mt-2 md:mt-0 p-input-icon-left">
                 <i className="pi pi-search" />
                 <InputText type="search" onInput={(e) => setGlobalFilter(e.currentTarget.value)} placeholder="Buscar..." />
@@ -185,8 +161,6 @@ const AdminDiscountTypesPage = () => {
         </>
     )
 
-    const dateRangeError = submitted && discountType.startDate && discountType.endDate && !isDateRangeValid()
-
     // ─── Render ────────────────────────────────────────────────────────────────
 
     return (
@@ -199,31 +173,28 @@ const AdminDiscountTypesPage = () => {
                     <DataTable
                         ref={dt}
                         value={discountTypes}
-                        dataKey="id"
+                        dataKey="name"
                         paginator
                         rows={10}
                         rowsPerPageOptions={[5, 10, 25]}
                         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-                        currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} tipos"
+                        currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} categorías"
                         globalFilter={globalFilter}
                         globalFilterFields={['name']}
-                        emptyMessage="No se encontraron tipos de descuento."
+                        emptyMessage="No se encontraron categorías de descuento."
                         header={header}
                         responsiveLayout="scroll"
                     >
-                        <Column field="id" header="ID" sortable headerStyle={{ minWidth: '5rem' }} />
-                        <Column field="name" header="Nombre" sortable headerStyle={{ minWidth: '14rem' }} />
-                        <Column header="Fecha Inicio" body={startDateBodyTemplate} sortable sortField="startDate" headerStyle={{ minWidth: '11rem' }} />
-                        <Column header="Fecha Fin" body={endDateBodyTemplate} sortable sortField="endDate" headerStyle={{ minWidth: '11rem' }} />
-                        <Column field="status" header="Activo" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '8rem' }} />
+                        <Column field="name" header="Nombre" sortable headerStyle={{ minWidth: '15rem' }} />
+                        <Column field="status" header="Activa" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '8rem' }} />
                         <Column body={actionBodyTemplate} headerStyle={{ minWidth: '10rem' }} />
                     </DataTable>
 
                     {/* CREATE / EDIT DIALOG */}
                     <Dialog
                         visible={typeDialog}
-                        style={{ width: '480px' }}
-                        header={discountType.id ? 'Editar Tipo de Descuento' : 'Nuevo Tipo de Descuento'}
+                        style={{ width: '450px' }}
+                        header={discountType.id ? 'Editar Categoría de Descuento' : 'Nueva Categoría de Descuento'}
                         modal
                         className="p-fluid"
                         footer={dialogFooter}
@@ -242,36 +213,8 @@ const AdminDiscountTypesPage = () => {
                             {submitted && !discountType.name?.trim() && <small className="p-error">El nombre es obligatorio.</small>}
                         </div>
 
-                        <div className="formgrid grid">
-                            <div className="field col">
-                                <label htmlFor="startDate">Fecha de Inicio</label>
-                                <Calendar
-                                    id="startDate"
-                                    value={discountType.startDate ?? null}
-                                    onChange={(e) => setDiscountType({ ...discountType, startDate: e.value as Date })}
-                                    dateFormat="dd/mm/yy"
-                                    showIcon
-                                    className={classNames({ 'p-invalid': submitted && !discountType.startDate })}
-                                />
-                                {submitted && !discountType.startDate && <small className="p-error">La fecha de inicio es obligatoria.</small>}
-                            </div>
-                            <div className="field col">
-                                <label htmlFor="endDate">Fecha de Fin</label>
-                                <Calendar
-                                    id="endDate"
-                                    value={discountType.endDate ?? null}
-                                    onChange={(e) => setDiscountType({ ...discountType, endDate: e.value as Date })}
-                                    dateFormat="dd/mm/yy"
-                                    showIcon
-                                    className={classNames({ 'p-invalid': submitted && (!discountType.endDate || dateRangeError) })}
-                                />
-                                {submitted && !discountType.endDate && <small className="p-error">La fecha de fin es obligatoria.</small>}
-                                {dateRangeError && <small className="p-error">La fecha de fin debe ser mayor o igual a la fecha de inicio.</small>}
-                            </div>
-                        </div>
-
                         <div className="field flex align-items-center gap-3">
-                            <label htmlFor="status" className="mb-0">Activo</label>
+                            <label htmlFor="status" className="mb-0">Activa</label>
                             <InputSwitch
                                 id="status"
                                 checked={discountType.status ?? true}
