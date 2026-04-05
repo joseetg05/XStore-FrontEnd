@@ -38,6 +38,18 @@ Todos los endpoints devuelven el mismo envelope JSON:
 
 ---
 
+## Autenticación
+
+Todos los endpoints marcados con 🔒 requieren un token JWT en el header:
+
+```
+Authorization: Bearer {token}
+```
+
+El token se obtiene al llamar `POST /api/sesiones/verificar`.
+
+---
+
 ## Integración desde el frontend
 
 ### Función base recomendada
@@ -45,11 +57,11 @@ Todos los endpoints devuelven el mismo envelope JSON:
 ```js
 const API_BASE = "http://localhost:5210";
 
-async function apiCall(method, path, body = null) {
-  const options = {
-    method,
-    headers: { "Content-Type": "application/json" },
-  };
+async function apiCall(method, path, body = null, token = null) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const options = { method, headers };
   if (body) options.body = JSON.stringify(body);
 
   const res = await fetch(`${API_BASE}${path}`, options);
@@ -59,21 +71,6 @@ async function apiCall(method, path, body = null) {
   return json.data;
 }
 ```
-
-### Ejemplos de uso
-
-```js
-// GET con query params
-const roles = await apiCall("GET", `/api/roles?nombreUsuario=admin`);
-
-// POST con body
-await apiCall("POST", "/api/roles", { nombreUsuario: "admin", nombre: "Vendedor", accesos: "ventas,inventario" });
-
-// PUT con body
-await apiCall("PUT", "/api/roles", { nombreUsuario: "admin", nombre: "Vendedor", nuevoNombre: "Cajero" });
-```
-
-> **Nota sobre auditorías:** el frontend debe llamar a `POST /api/auditorias` después de cada operación importante (crear, modificar) para registrar la trazabilidad.
 
 ---
 
@@ -95,9 +92,9 @@ Verifica que la API está funcionando.
 
 ### Sesiones (Login)
 
-#### `POST /api/sesiones/verificar`
+#### `POST /api/sesiones/verificar` — público
 
-Verifica credenciales de un usuario (login). Retorna los datos del usuario si son válidas.
+Verifica credenciales de un usuario (login). Retorna un token JWT.
 
 **Body:**
 
@@ -113,51 +110,55 @@ Verifica credenciales de un usuario (login). Retorna los datos del usuario si so
 | `nombreUsuario` | string | Sí        | Nombre de usuario del sistema |
 | `passwordHash`  | string | Sí        | Hash de la contraseña         |
 
-**Respuesta `data`:** array con los datos del usuario autenticado.
+**Respuesta `data`:**
+
+```json
+{
+  "token": "eyJ...",
+  "nombreRol": "Administrador",
+  "accesos": "ventas,inventario"
+}
+```
 
 ---
 
-#### `POST /api/sesiones`
+#### `POST /api/sesiones` 🔒
 
-Registra una nueva sesión de usuario (uso interno / creación de cuenta).
+Registra credenciales de login a una persona ya existente en el sistema.
 
 **Body:**
 
 ```json
 {
   "creadorCuenta": "admin",
-  "personaId": 1,
+  "identificacion": "1-1234-5678",
   "nombreUsuario": "jperez",
   "passwordHash": "abc123hash",
-  "nombreRol": "Administrador"
+  "nombreRol": "Vendedor"
 }
 ```
 
-| Campo           | Tipo   | Requerido | Descripción                   |
-| --------------- | ------ | --------- | ----------------------------- |
-| `creadorCuenta` | string | No        | Usuario que creó la cuenta    |
-| `personaId`     | number | Sí        | ID de la persona asociada     |
-| `nombreUsuario` | string | Sí        | Nombre de usuario del sistema |
-| `passwordHash`  | string | Sí        | Hash de la contraseña         |
-| `nombreRol`     | string | Sí        | Rol asignado                  |
+| Campo            | Tipo   | Requerido | Descripción                                                      |
+| ---------------- | ------ | --------- | ---------------------------------------------------------------- |
+| `creadorCuenta`  | string | No        | Admin que crea la cuenta (`null` = auto-registro)                |
+| `identificacion` | string | Sí        | Identificación de la persona a la que se le asignan credenciales |
+| `nombreUsuario`  | string | Sí        | Username de login                                                |
+| `passwordHash`   | string | Sí        | Contraseña hasheada                                              |
+| `nombreRol`      | string | Sí        | Rol asignado                                                     |
+
+> ⚠️ **Cambio:** antes aceptaba `personaId` (número); ahora acepta `identificacion` (string).
 
 ---
 
 ### Roles
 
-#### `GET /api/roles?nombreUsuario={nombreUsuario}`
+#### `GET /api/roles?nombreUsuario={nombreUsuario}` 🔒
 
 Lista todos los roles disponibles.
 
-| Param           | Tipo   | Descripción                                 |
-| --------------- | ------ | ------------------------------------------- |
-| `nombreUsuario` | string | Usuario que realiza la consulta (auditoría) |
-
-**Respuesta `data`:** array de objetos con los roles.
-
 ---
 
-#### `POST /api/roles`
+#### `POST /api/roles` 🔒
 
 Registra un nuevo rol.
 
@@ -171,17 +172,17 @@ Registra un nuevo rol.
 }
 ```
 
-| Campo           | Tipo   | Requerido | Descripción                                                 |
-| --------------- | ------ | --------- | ----------------------------------------------------------- |
-| `nombreUsuario` | string | Sí        | Usuario que ejecuta la acción                               |
-| `nombre`        | string | Sí        | Nombre del rol                                              |
-| `accesos`       | string | Sí        | Permisos del rol (formato libre, ej: `"ventas,inventario"`) |
+| Campo           | Tipo   | Requerido | Descripción                                  |
+| --------------- | ------ | --------- | -------------------------------------------- |
+| `nombreUsuario` | string | Sí        | Usuario que ejecuta la acción                |
+| `nombre`        | string | Sí        | Nombre del rol                               |
+| `accesos`       | string | Sí        | Permisos del rol (ej: `"ventas,inventario"`) |
 
 ---
 
-#### `PUT /api/roles`
+#### `PUT /api/roles` 🔒
 
-Modifica un rol existente. Solo se envían los campos a cambiar.
+Modifica un rol existente.
 
 **Body:**
 
@@ -207,30 +208,23 @@ Modifica un rol existente. Solo se envían los campos a cambiar.
 
 ### Tipos de Producto
 
-#### `GET /api/tipos-productos?nombreUsuario={nombreUsuario}`
+#### `GET /api/tipos-productos?nombreUsuario={nombreUsuario}` — público
 
 Lista todos los tipos de producto.
 
 ---
 
-#### `POST /api/tipos-productos`
-
-Registra un nuevo tipo de producto.
+#### `POST /api/tipos-productos` 🔒
 
 **Body:**
 
 ```json
-{
-  "nombreUsuario": "admin",
-  "nombre": "Electrónico"
-}
+{ "nombreUsuario": "admin", "nombre": "Electrónico" }
 ```
 
 ---
 
-#### `PUT /api/tipos-productos`
-
-Modifica un tipo de producto existente.
+#### `PUT /api/tipos-productos` 🔒
 
 **Body:**
 
@@ -253,30 +247,23 @@ Modifica un tipo de producto existente.
 
 ### Marcas de Producto
 
-#### `GET /api/marcas-productos?nombreUsuario={nombreUsuario}`
+#### `GET /api/marcas-productos?nombreUsuario={nombreUsuario}` — público
 
 Lista todas las marcas de producto.
 
 ---
 
-#### `POST /api/marcas-productos`
-
-Registra una nueva marca.
+#### `POST /api/marcas-productos` 🔒
 
 **Body:**
 
 ```json
-{
-  "nombreUsuario": "admin",
-  "nombre": "Samsung"
-}
+{ "nombreUsuario": "admin", "nombre": "Samsung" }
 ```
 
 ---
 
-#### `PUT /api/marcas-productos`
-
-Modifica una marca existente.
+#### `PUT /api/marcas-productos` 🔒
 
 **Body:**
 
@@ -293,30 +280,23 @@ Modifica una marca existente.
 
 ### Ubicaciones
 
-#### `GET /api/ubicaciones?nombreUsuario={nombreUsuario}`
+#### `GET /api/ubicaciones?nombreUsuario={nombreUsuario}` 🔒
 
 Lista todas las ubicaciones de almacén.
 
 ---
 
-#### `POST /api/ubicaciones`
-
-Registra una nueva ubicación.
+#### `POST /api/ubicaciones` 🔒
 
 **Body:**
 
 ```json
-{
-  "nombreUsuario": "admin",
-  "nombre": "Bodega A"
-}
+{ "nombreUsuario": "admin", "nombre": "Bodega A" }
 ```
 
 ---
 
-#### `PUT /api/ubicaciones`
-
-Modifica una ubicación existente.
+#### `PUT /api/ubicaciones` 🔒
 
 **Body:**
 
@@ -333,15 +313,13 @@ Modifica una ubicación existente.
 
 ### Tipos de Persona
 
-#### `GET /api/tipos-personas?nombreUsuario={nombreUsuario}`
+#### `GET /api/tipos-personas?nombreUsuario={nombreUsuario}` 🔒
 
-Lista todos los tipos de persona (ej: cliente regular, VIP, mayorista).
+Lista todos los tipos de persona.
 
 ---
 
-#### `POST /api/tipos-personas`
-
-Registra un nuevo tipo de persona.
+#### `POST /api/tipos-personas` 🔒
 
 **Body:**
 
@@ -357,14 +335,12 @@ Registra un nuevo tipo de persona.
 | Campo          | Tipo    | Descripción                     |
 | -------------- | ------- | ------------------------------- |
 | `nombre`       | string  | Nombre del tipo                 |
-| `descuentoPct` | decimal | Porcentaje de descuento (0-100) |
+| `descuentoPct` | decimal | Porcentaje de descuento (0–100) |
 | `montoMeta`    | decimal | Monto de compra objetivo        |
 
 ---
 
-#### `PUT /api/tipos-personas`
-
-Modifica un tipo de persona existente.
+#### `PUT /api/tipos-personas` 🔒
 
 **Body:**
 
@@ -379,33 +355,36 @@ Modifica un tipo de persona existente.
 }
 ```
 
-| Campo               | Requerido | Descripción                            |
-| ------------------- | --------- | -------------------------------------- |
-| `nombre`            | Sí        | Nombre actual del tipo (identificador) |
-| `nuevoNombre`       | No        | Nuevo nombre                           |
-| `nuevoDescuentoPct` | No        | Nuevo porcentaje de descuento          |
-| `nuevoMontoMeta`    | No        | Nuevo monto objetivo                   |
-| `nuevoEstado`       | No        | Estado activo/inactivo                 |
+| Campo               | Requerido | Descripción                   |
+| ------------------- | --------- | ----------------------------- |
+| `nombre`            | Sí        | Nombre actual (identificador) |
+| `nuevoNombre`       | No        | Nuevo nombre                  |
+| `nuevoDescuentoPct` | No        | Nuevo porcentaje de descuento |
+| `nuevoMontoMeta`    | No        | Nuevo monto objetivo          |
+| `nuevoEstado`       | No        | Estado activo/inactivo        |
 
 ---
 
 ### Personas
 
-#### `GET /api/personas?nombreUsuario={nombreUsuario}&filtro={filtro}&busqueda={busqueda}`
+#### `GET /api/personas?nombreUsuario={u}&rolFiltro={r}&tipoPersonaFiltro={t}&busqueda={b}` 🔒
 
-Consulta personas (clientes/usuarios).
+Consulta personas con filtros opcionales.
 
-| Param           | Tipo   | Requerido | Descripción                                              |
-| --------------- | ------ | --------- | -------------------------------------------------------- |
-| `nombreUsuario` | string | Sí        | Usuario que consulta                                     |
-| `filtro`        | string | No        | Filtro de categoría; por defecto `"TODOS"`               |
-| `busqueda`      | string | No        | Texto libre para buscar por nombre, identificación, etc. |
+| Param               | Tipo   | Requerido | Descripción                                                                |
+| ------------------- | ------ | --------- | -------------------------------------------------------------------------- |
+| `nombreUsuario`     | string | Sí        | Usuario que consulta                                                       |
+| `rolFiltro`         | string | No        | Filtra por rol: `Administradores`, `Vendedores`, `Clientes`, `Proveedores` |
+| `tipoPersonaFiltro` | string | No        | Nombre exacto del tipo de persona                                          |
+| `busqueda`          | string | No        | Búsqueda parcial por nombre, identificación, correo, teléfono o usuario    |
+
+> ⚠️ **Cambio:** antes tenía un solo param `filtro` con valor por defecto `"TODOS"`; ahora son `rolFiltro` y `tipoPersonaFiltro` separados.
 
 ---
 
-#### `POST /api/usuarios`
+#### `POST /api/usuarios` — público
 
-Registra un nuevo usuario del sistema (crea persona + credenciales de acceso).
+Registra un nuevo usuario del sistema. Internamente crea la persona y luego sus credenciales de login en dos pasos.
 
 **Body:**
 
@@ -417,6 +396,7 @@ Registra un nuevo usuario del sistema (crea persona + credenciales de acceso).
   "telefono": "8888-8888",
   "correo": "juan@ejemplo.com",
   "direccion": "San José, Costa Rica",
+  "tipoPersona": "Vendedor",
   "newUser": "jperez",
   "passwordHash": "hash_de_la_contraseña",
   "nombreRol": "Vendedor",
@@ -424,22 +404,25 @@ Registra un nuevo usuario del sistema (crea persona + credenciales de acceso).
 }
 ```
 
-| Campo            | Tipo    | Requerido | Descripción                                                 |
-| ---------------- | ------- | --------- | ----------------------------------------------------------- |
-| `nombreUsuario`  | string  | No        | Admin responsable de la creación (null si es auto-registro) |
-| `identificacion` | string  | Sí        | Cédula u identificación                                     |
-| `nombreCompleto` | string  | Sí        | Nombre completo                                             |
-| `telefono`       | string  | No        | Teléfono                                                    |
-| `correo`         | string  | No        | Correo electrónico                                          |
-| `direccion`      | string  | No        | Dirección                                                   |
-| `newUser`        | string  | Sí        | Username de login                                           |
-| `passwordHash`   | string  | Sí        | Contraseña hasheada                                         |
-| `nombreRol`      | string  | Sí        | Rol asignado                                                |
-| `esProveedor`    | boolean | No        | `true` si es un proveedor; por defecto `false`              |
+| Campo            | Tipo    | Requerido | Descripción                                                       |
+| ---------------- | ------- | --------- | ----------------------------------------------------------------- |
+| `nombreUsuario`  | string  | No        | Admin responsable (`null` = auto-registro de cliente)             |
+| `identificacion` | string  | Sí        | Cédula u identificación (mín. 9 caracteres)                       |
+| `nombreCompleto` | string  | Sí        | Nombre completo                                                   |
+| `telefono`       | string  | No        | Teléfono                                                          |
+| `correo`         | string  | No        | Correo electrónico                                                |
+| `direccion`      | string  | No        | Dirección                                                         |
+| `tipoPersona`    | string  | No        | Tipo de persona (requerido cuando lo registra un admin)           |
+| `newUser`        | string  | Sí        | Username de login                                                 |
+| `passwordHash`   | string  | Sí        | Contraseña hasheada                                               |
+| `nombreRol`      | string  | Sí        | Rol asignado                                                      |
+| `esProveedor`    | boolean | No        | `true` si también se registra como proveedor; por defecto `false` |
+
+> ⚠️ **Cambio:** antes usaba un SP único; ahora ejecuta dos llamadas internas (crear persona + crear credenciales). Se agregó campo opcional `tipoPersona`.
 
 ---
 
-#### `PUT /api/personas`
+#### `PUT /api/personas` 🔒
 
 Modifica datos de una persona existente.
 
@@ -448,36 +431,56 @@ Modifica datos de una persona existente.
 ```json
 {
   "nombreUsuario": "admin",
-  "personaId": 5,
-  "nuevaIdentificacion": "1-1234-9999",
-  "nuevoNombreCompleto": "Juan A. Pérez",
+  "identificacion": "1-1234-5678",
+  "nuevoNombre": "Juan A. Pérez",
   "nuevoTelefono": "7777-7777",
   "nuevoCorreo": "juanperez@ejemplo.com",
   "nuevaDireccion": "Heredia, Costa Rica",
+  "nuevoTipoPersona": "VIP",
   "nuevoEstado": true
 }
 ```
 
-| Campo        | Requerido | Descripción                  |
-| ------------ | --------- | ---------------------------- |
-| `personaId`  | Sí        | ID de la persona a modificar |
-| demás campos | No        | Solo enviar los que cambian  |
+| Campo              | Requerido | Descripción                                             |
+| ------------------ | --------- | ------------------------------------------------------- |
+| `identificacion`   | Sí        | Identificación de la persona (usado para ubicarla)      |
+| `nuevoNombre`      | No        | Nuevo nombre completo                                   |
+| `nuevoTelefono`    | No        | `""` para borrar el teléfono, `null` para no modificar  |
+| `nuevoCorreo`      | No        | `""` para borrar el correo, `null` para no modificar    |
+| `nuevaDireccion`   | No        | `""` para borrar la dirección, `null` para no modificar |
+| `nuevoTipoPersona` | No        | Solo puede modificarlo un Administrador                 |
+| `nuevoEstado`      | No        | Solo puede modificarlo un Administrador                 |
+
+> ⚠️ **Cambio:** antes se identificaba la persona por `personaId` (número) y aceptaba `nuevaIdentificacion`, `nuevoNombreCompleto`; ahora se identifica por `identificacion` (string), `nuevoNombreCompleto` → `nuevoNombre`, `nuevaIdentificacion` eliminado, se agregó `nuevoTipoPersona`.
 
 ---
 
 ### Proveedores
 
-#### `GET /api/proveedores/nombres?nombreUsuario={nombreUsuario}`
+#### `GET /api/proveedores?nombreUsuario={u}&busqueda={b}` 🔒
 
-Retorna la lista de nombres de proveedores (útil para dropdowns/selects).
+Retorna el detalle completo de todos los proveedores (nombre, identificación, contacto, estado, etc.).
 
-| Param           | Tipo   | Descripción                     |
-| --------------- | ------ | ------------------------------- |
-| `nombreUsuario` | string | Usuario que realiza la consulta |
+| Param           | Tipo   | Requerido | Descripción                                                    |
+| --------------- | ------ | --------- | -------------------------------------------------------------- |
+| `nombreUsuario` | string | Sí        | Usuario que consulta (debe ser Administrador)                  |
+| `busqueda`      | string | No        | Búsqueda parcial por nombre, identificación, correo o teléfono |
+
+> Este endpoint es el que debe usarse para el CRUD de proveedores en el frontend, ya que incluye la `identificación` necesaria para operaciones de edición.
 
 ---
 
-#### `POST /api/proveedores`
+#### `GET /api/proveedores/nombres?nombreUsuario={nombreUsuario}` 🔒
+
+Retorna únicamente los nombres de los proveedores. Ideal para dropdowns/selects.
+
+| Param           | Tipo   | Descripción                                              |
+| --------------- | ------ | -------------------------------------------------------- |
+| `nombreUsuario` | string | Usuario que realiza la consulta (debe ser Administrador) |
+
+---
+
+#### `POST /api/proveedores` 🔒
 
 Registra un nuevo proveedor.
 
@@ -505,7 +508,7 @@ Registra un nuevo proveedor.
 
 ---
 
-#### `PUT /api/proveedores`
+#### `PUT /api/proveedores` 🔒
 
 Modifica un proveedor existente.
 
@@ -514,9 +517,8 @@ Modifica un proveedor existente.
 ```json
 {
   "nombreUsuario": "admin",
-  "proveedorId": 3,
-  "nuevaIdentificacion": "3-101-999999",
-  "nuevoNombreCompleto": "Distribuidora XYZ Internacional",
+  "identificacion": "3-101-123456",
+  "nuevoNombre": "Distribuidora XYZ Internacional",
   "nuevoTelefono": "2233-2233",
   "nuevoCorreo": "ventas@xyz.com",
   "nuevaDireccion": "Cartago, Costa Rica",
@@ -524,39 +526,38 @@ Modifica un proveedor existente.
 }
 ```
 
-| Campo         | Requerido | Descripción                  |
-| ------------- | --------- | ---------------------------- |
-| `proveedorId` | Sí        | ID del proveedor a modificar |
-| demás campos  | No        | Solo enviar los que cambian  |
+| Campo            | Requerido | Descripción                                        |
+| ---------------- | --------- | -------------------------------------------------- |
+| `identificacion` | Sí        | Identificación del proveedor (usado para ubicarlo) |
+| `nuevoNombre`    | No        | Nuevo nombre completo                              |
+| `nuevoTelefono`  | No        | `""` para borrar, `null` para no modificar         |
+| `nuevoCorreo`    | No        | `""` para borrar, `null` para no modificar         |
+| `nuevaDireccion` | No        | `""` para borrar, `null` para no modificar         |
+| `nuevoEstado`    | No        | Estado activo/inactivo                             |
+
+> ⚠️ **Cambio:** antes se identificaba el proveedor por `proveedorId` (número) y aceptaba `nuevaIdentificacion`, `nuevoNombreCompleto`; ahora se identifica por `identificacion` (string), `nuevoNombreCompleto` → `nuevoNombre`, `nuevaIdentificacion` y `proveedorId` eliminados.
 
 ---
 
 ### Categorías de Descuento
 
-#### `GET /api/cat-descuentos?nombreUsuario={nombreUsuario}`
+#### `GET /api/cat-descuentos?nombreUsuario={nombreUsuario}` 🔒
 
 Lista todas las categorías de descuento.
 
 ---
 
-#### `POST /api/cat-descuentos`
-
-Registra una nueva categoría de descuento.
+#### `POST /api/cat-descuentos` 🔒
 
 **Body:**
 
 ```json
-{
-  "nombreUsuario": "admin",
-  "nombre": "Descuento Navideño"
-}
+{ "nombreUsuario": "admin", "nombre": "Descuento Navideño" }
 ```
 
 ---
 
-#### `PUT /api/cat-descuentos`
-
-Modifica una categoría de descuento existente.
+#### `PUT /api/cat-descuentos` 🔒
 
 **Body:**
 
@@ -569,40 +570,27 @@ Modifica una categoría de descuento existente.
 }
 ```
 
-| Campo         | Requerido | Descripción                   |
-| ------------- | --------- | ----------------------------- |
-| `nombre`      | Sí        | Nombre actual (identificador) |
-| `nuevoNombre` | No        | Nuevo nombre                  |
-| `nuevoEstado` | No        | Estado activo/inactivo        |
-
 ---
 
 ### Estados de Entrega
 
-#### `GET /api/estados-entregas?nombreUsuario={nombreUsuario}`
+#### `GET /api/estados-entregas?nombreUsuario={nombreUsuario}` 🔒
 
-Lista todos los estados de entrega (ej: Pendiente, En camino, Entregado).
+Lista todos los estados de entrega.
 
 ---
 
-#### `POST /api/estados-entregas`
-
-Registra un nuevo estado de entrega.
+#### `POST /api/estados-entregas` 🔒
 
 **Body:**
 
 ```json
-{
-  "nombreUsuario": "admin",
-  "nombre": "En camino"
-}
+{ "nombreUsuario": "admin", "nombre": "En camino" }
 ```
 
 ---
 
-#### `PUT /api/estados-entregas`
-
-Modifica un estado de entrega existente.
+#### `PUT /api/estados-entregas` 🔒
 
 **Body:**
 
@@ -615,17 +603,140 @@ Modifica un estado de entrega existente.
 }
 ```
 
-| Campo         | Requerido | Descripción                   |
-| ------------- | --------- | ----------------------------- |
-| `nombre`      | Sí        | Nombre actual (identificador) |
-| `nuevoNombre` | No        | Nuevo nombre                  |
-| `nuevoEstado` | No        | Estado activo/inactivo        |
+---
+
+### Descuentos
+
+#### `GET /api/descuentos?nombreUsuario={u}&categoriaFiltro={c}&fechaDesde={d}&fechaHasta={h}` 🔒
+
+Consulta descuentos con filtros opcionales.
+
+| Param             | Tipo   | Requerido | Descripción                            |
+| ----------------- | ------ | --------- | -------------------------------------- |
+| `nombreUsuario`   | string | Sí        | Usuario que consulta                   |
+| `categoriaFiltro` | string | No        | Nombre exacto de la categoría          |
+| `fechaDesde`      | date   | No        | Rango de inicio (formato `YYYY-MM-DD`) |
+| `fechaHasta`      | date   | No        | Rango de fin (formato `YYYY-MM-DD`)    |
+
+---
+
+#### `POST /api/descuentos` 🔒
+
+Registra un nuevo descuento.
+
+**Body:**
+
+```json
+{
+  "nombreUsuario": "admin",
+  "nombreComercial": "Black Friday 2026",
+  "descripcion": "Descuento especial de fin de año",
+  "categoria": "Descuento Fin de Año",
+  "porcentaje": 25.0,
+  "fechaInicio": "2026-11-27",
+  "fechaFinal": "2026-11-30"
+}
+```
+
+| Campo             | Tipo    | Requerido | Descripción                                               |
+| ----------------- | ------- | --------- | --------------------------------------------------------- |
+| `nombreUsuario`   | string  | Sí        | Usuario que ejecuta la acción                             |
+| `nombreComercial` | string  | Sí        | Nombre del descuento                                      |
+| `descripcion`     | string  | Sí        | Descripción del descuento                                 |
+| `categoria`       | string  | Sí        | Nombre de la categoría (debe existir en `cat-descuentos`) |
+| `porcentaje`      | decimal | Sí        | Porcentaje de descuento (ej: `25.00`)                     |
+| `fechaInicio`     | date    | Sí        | Fecha de inicio (`YYYY-MM-DD`)                            |
+| `fechaFinal`      | date    | Sí        | Fecha de finalización (`YYYY-MM-DD`)                      |
+
+---
+
+#### `PUT /api/descuentos` 🔒
+
+Modifica un descuento existente.
+
+**Body:**
+
+```json
+{
+  "nombreUsuario": "admin",
+  "nombreComercial": "Black Friday 2026",
+  "nuevoNombreComercial": "Black Friday Extended",
+  "nuevaDescripcion": null,
+  "nuevaCategoria": null,
+  "nuevoPorcentaje": 30.0,
+  "nuevaFechaInicio": null,
+  "nuevaFechaFin": "2026-12-02",
+  "nuevoEstado": true
+}
+```
+
+| Campo             | Requerido | Descripción                                         |
+| ----------------- | --------- | --------------------------------------------------- |
+| `nombreComercial` | Sí        | Nombre actual del descuento (identificador)         |
+| demás campos      | No        | Solo enviar los que cambian (`null` = no modificar) |
+
+---
+
+### Productos
+
+#### `GET /api/productos?nombreUsuario={u}&filtroDescripcion={d}&filtroTipo={t}&filtroMarca={m}&filtroProveedor={p}&filtroDescuento={dc}` 🔒
+
+Consulta productos con filtros opcionales.
+
+| Param               | Tipo   | Requerido | Descripción                          |
+| ------------------- | ------ | --------- | ------------------------------------ |
+| `nombreUsuario`     | string | Sí        | Usuario que consulta                 |
+| `filtroDescripcion` | string | No        | Búsqueda parcial en descripción      |
+| `filtroTipo`        | string | No        | Nombre exacto del tipo de producto   |
+| `filtroMarca`       | string | No        | Nombre exacto de la marca            |
+| `filtroProveedor`   | string | No        | Nombre exacto del proveedor          |
+| `filtroDescuento`   | string | No        | Nombre exacto del descuento aplicado |
+
+---
+
+#### `POST /api/productos` 🔒
+
+Registra un nuevo producto e ingresa stock al inventario.
+
+**Body:**
+
+```json
+{
+  "nombreUsuario": "admin",
+  "rutaImagen": "/images/productos/laptop-hp.jpg",
+  "descripcion": "Laptop HP 15 pulgadas",
+  "tipoProducto": "Computadoras",
+  "marcaProducto": "HP",
+  "nombreProveedor": "Distribuidora XYZ S.A.",
+  "precioCompra": 350000.0,
+  "precioVenta": 499000.0,
+  "nombreUbicacion": "Bodega A",
+  "cantidadIngreso": 10,
+  "stockMinimo": 2,
+  "nombreDescuento": null
+}
+```
+
+| Campo             | Tipo    | Requerido | Descripción                                                          |
+| ----------------- | ------- | --------- | -------------------------------------------------------------------- |
+| `nombreUsuario`   | string  | Sí        | Usuario que ejecuta la acción                                        |
+| `rutaImagen`      | string  | Sí        | Ruta o URL de la imagen del producto                                 |
+| `descripcion`     | string  | Sí        | Descripción del producto                                             |
+| `tipoProducto`    | string  | Sí        | Nombre exacto del tipo (debe existir en `tipos-productos`)           |
+| `marcaProducto`   | string  | Sí        | Nombre exacto de la marca (debe existir en `marcas-productos`)       |
+| `nombreProveedor` | string  | Sí        | Nombre completo del proveedor (debe existir en `proveedores`)        |
+| `precioCompra`    | decimal | Sí        | Precio de compra                                                     |
+| `precioVenta`     | decimal | Sí        | Precio de venta al público                                           |
+| `nombreUbicacion` | string  | Sí        | Nombre de la ubicación de inventario (debe existir en `ubicaciones`) |
+| `cantidadIngreso` | int     | Sí        | Cantidad a ingresar al inventario                                    |
+| `stockMinimo`     | int     | Sí        | Stock mínimo (solo aplica si es la primera vez en esa ubicación)     |
+| `nombreDescuento` | string  | No        | Nombre del descuento a aplicar (`null` = sin descuento)              |
 
 ---
 
 ### Auditorías
 
-#### `GET /api/auditorias?nombreUsuario={nombreUsuario}&fechaFiltro={fecha}&tablaFiltro={tabla}`
+#### `GET /api/auditorias?nombreUsuario={u}&fechaFiltro={f}&tablaFiltro={t}` 🔒
 
 Consulta el registro de auditoría.
 
@@ -637,7 +748,7 @@ Consulta el registro de auditoría.
 
 ---
 
-#### `POST /api/auditorias`
+#### `POST /api/auditorias` 🔒
 
 Registra una entrada de auditoría. **El frontend debe llamar este endpoint después de cada operación de escritura.**
 
@@ -655,25 +766,28 @@ Registra una entrada de auditoría. **El frontend debe llamar este endpoint desp
 }
 ```
 
-| Campo           | Tipo   | Requerido | Descripción                                                    |
-| --------------- | ------ | --------- | -------------------------------------------------------------- |
-| `personaId`     | number | Sí        | ID del usuario que realizó la acción                           |
-| `accion`        | string | Sí        | Tipo de acción: `"SELECT"`, `"INSERT"`, `"UPDATE"`, `"DELETE"` |
-| `tablaAfectada` | string | Sí        | Nombre de la tabla afectada                                    |
-| `filaAfectada`  | number | Sí        | ID del registro afectado (0 para SELECT)                       |
-| `descripcion`   | string | Sí        | Descripción legible de lo que se hizo                          |
-| `antes`         | string | No        | JSON stringify del estado anterior                             |
-| `despues`       | string | No        | JSON stringify del estado nuevo                                |
+| Campo           | Tipo   | Requerido | Descripción                                                         |
+| --------------- | ------ | --------- | ------------------------------------------------------------------- |
+| `personaId`     | number | Sí        | ID del usuario que realizó la acción                                |
+| `accion`        | string | Sí        | `"SELECT"`, `"INSERT"`, `"UPDATE"` o `"DELETE"`                     |
+| `tablaAfectada` | string | Sí        | Nombre de la tabla afectada                                         |
+| `filaAfectada`  | number | Sí        | ID del registro afectado (`0` para SELECT)                          |
+| `descripcion`   | string | Sí        | Descripción legible (mín. 11 caracteres)                            |
+| `antes`         | string | No        | JSON stringify del estado anterior (requerido para UPDATE y DELETE) |
+| `despues`       | string | No        | JSON stringify del estado nuevo (requerido para INSERT y UPDATE)    |
 
-//1. Health — ping de salud de la API  
- //2. Sesiones — login (/verificar) y creación de cuenta  
- //3. Roles — CRUD de roles del sistema  
- //4. Tipos de Producto — CRUD de tipos/categorías de producto  
- //5. Marcas de Producto — CRUD de marcas  
- //6. Ubicaciones — CRUD de ubicaciones de almacén  
- 7. Tipos de Persona — CRUD de tipos de cliente (con descuento % y monto meta) ?? 8. Personas — consulta y edición de clientes/usuarios  
- 9. Usuarios — creación de usuario (persona + credenciales en un endpoint)  
- 10. Proveedores — CRUD de proveedores + endpoint de nombres para dropdowns  
- //11. Categorías de Descuento — CRUD de categorías de descuento  
- //12. Estados de Entrega — CRUD de estados de entrega (Pendiente, En camino, etc.)  
- 13. Auditorías — consulta y registro de auditoría
+//1. Health — GET /api/health  
+ //2. Sesiones — POST /verificar (login) + POST /api/sesiones (crear cuenta)  
+ //3. Roles — GET + POST + PUT /api/roles  
+ //4. Tipos de Producto — GET + POST + PUT /api/tipos-productos  
+ //5. Marcas de Producto — GET + POST + PUT /api/marcas-productos  
+ //6. Ubicaciones — GET + POST + PUT /api/ubicaciones  
+ 7. Tipos de Persona — GET + POST + PUT /api/tipos-personas  
+ 8. Personas — GET /api/personas + PUT /api/personas  
+ 9. Usuarios — POST /api/usuarios (registro)
+//10. Proveedores — GET /api/proveedores + GET /nombres + POST + PUT  
+ //11. Categorías Descuento — GET + POST + PUT /api/cat-descuentos  
+ //12. Estados de Entrega — GET + POST + PUT /api/estados-entregas  
+ 13. Descuentos — GET + POST + PUT /api/descuentos ← NUEVO  
+ 14. Productos — GET + POST /api/productos ← NUEVO  
+ 15. Auditorías — GET + POST /api/auditorias
