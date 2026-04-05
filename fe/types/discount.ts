@@ -1,12 +1,10 @@
-/**
- * Maps to the backend table columns:
- * DESC_ID, DESC_Nombre, DESC_TIPO_DESC_ID, DESC_Porcentaje, DESC_Estado
- */
 export interface Discount {
-    id: number
-    name: string
-    discountTypeId: number
+    name: string        // nombreComercial — identificador en la API
+    description: string
+    category: string    // nombre de la categoría (cat-descuentos)
     percentage: number
+    startDate: string   // YYYY-MM-DD
+    endDate: string     // YYYY-MM-DD
     status: boolean
 }
 

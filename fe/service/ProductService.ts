@@ -1,5 +1,6 @@
 import { BrandService } from './BrandService'
 import { ProductTypeService } from './ProductTypeService'
+import { DiscountService } from './DiscountService'
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -14,9 +15,8 @@ export interface Brand {
 }
 
 export interface Discount {
-    id: number;
     name: string;
-    percentage: number; // e.g., 20 for 20%
+    percentage: number;
 }
 
 /**
@@ -30,7 +30,7 @@ export interface Product {
     brandId: number;
     imageUrl: string;
     description: string;
-    discountId: number;
+    discountName: string;
     purchasePrice: number;
     salePrice: number;
     status: boolean;
@@ -68,11 +68,6 @@ const MOCK_BRANDS: Brand[] = [
     { id: 6, name: 'Sony' }
 ];
 
-const MOCK_DISCOUNTS: Discount[] = [
-    { id: 1, name: 'Oferta de Lanzamiento', percentage: 10 },
-    { id: 2, name: 'Liquidación de Temporada', percentage: 25 },
-    { id: 3, name: 'Descuento Especial', percentage: 50 }
-];
 
 const MOCK_PRODUCTS: Product[] = [
     {
@@ -81,7 +76,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 1,
         imageUrl: '/layout/images/products/iPhone 15 Pro 8GB + 256GB Negro.png',
         description: 'iPhone 15 Pro 8GB + 256GB Negro',
-        discountId: 1,
+        discountName: 'Oferta de Lanzamiento 10%',
         purchasePrice: 700000,
         salePrice: 1009900,
         status: true
@@ -92,7 +87,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 2,
         imageUrl: '/layout/images/products/Motorola G56 8GB + 256GB Verde.png',
         description: 'Motorola G56 8GB + 256GB Verde',
-        discountId: 2,
+        discountName: 'Liquidación de Temporada 25%',
         purchasePrice: 60000,
         salePrice: 99895,
         status: true
@@ -103,7 +98,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 6,
         imageUrl: 'https://via.placeholder.com/300x200?text=Sony+WH-1000XM5',
         description: 'Sony WH-1000XM5',
-        discountId: 2,
+        discountName: 'Liquidación de Temporada 25%',
         purchasePrice: 200,
         salePrice: 349,
         status: true
@@ -114,7 +109,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 3,
         imageUrl: 'https://via.placeholder.com/300x200?text=Nike+Air+Max',
         description: 'Nike Air Max',
-        discountId: 0,
+        discountName: '',
         purchasePrice: 60,
         salePrice: 120,
         status: true
@@ -125,7 +120,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 4,
         imageUrl: 'https://via.placeholder.com/300x200?text=Adidas+Ultraboost',
         description: 'Adidas Ultraboost',
-        discountId: 1,
+        discountName: 'Oferta de Lanzamiento 10%',
         purchasePrice: 80,
         salePrice: 180,
         status: true
@@ -136,7 +131,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 1,
         imageUrl: 'https://via.placeholder.com/300x200?text=Apple+Watch+S9',
         description: 'Apple Watch S9',
-        discountId: 0,
+        discountName: '',
         purchasePrice: 250,
         salePrice: 399,
         status: true
@@ -147,7 +142,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 3,
         imageUrl: 'https://via.placeholder.com/300x200?text=Nike+Cap',
         description: 'Gorra Nike',
-        discountId: 0,
+        discountName: '',
         purchasePrice: 12,
         salePrice: 30,
         status: true
@@ -158,7 +153,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 5,
         imageUrl: 'https://via.placeholder.com/300x200?text=IKEA+KALLAX',
         description: 'IKEA KALLAX',
-        discountId: 0,
+        discountName: '',
         purchasePrice: 40,
         salePrice: 79,
         status: true
@@ -169,7 +164,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 2,
         imageUrl: 'https://via.placeholder.com/300x200?text=Samsung+TV+55',
         description: 'Samsung TV 55"',
-        discountId: 0,
+        discountName: '',
         purchasePrice: 350,
         salePrice: 699,
         status: false // inactive — should NOT appear in catalog
@@ -180,7 +175,7 @@ const MOCK_PRODUCTS: Product[] = [
         brandId: 4,
         imageUrl: 'https://via.placeholder.com/300x200?text=Adidas+T-Shirt',
         description: 'Camiseta Adidas',
-        discountId: 3,
+        discountName: 'Descuento Especial 50%',
         purchasePrice: 15,
         salePrice: 35,
         status: true
@@ -227,13 +222,9 @@ export const ProductService = {
         return BrandService.getActiveBrands()
     },
 
-    /**
-     * Retorna todos los descuentos disponibles.
-     */
-    getDiscounts(): Promise<Discount[]> {
-        // TODO: habilitar cuando exista backend real
-        // return fetch(`${process.env.NEXT_PUBLIC_API_URL}/discounts`).then(r => r.json());
-        return Promise.resolve(MOCK_DISCOUNTS);
+    async getDiscounts(): Promise<Discount[]> {
+        const active = await DiscountService.getActive()
+        return active.map((d) => ({ name: d.name, percentage: d.percentage }))
     },
 
     /**

@@ -32,7 +32,7 @@ interface ProductCardProps {
 const ProductCard = ({ product, brands, productTypes, discounts, onView, onAddToCart }: ProductCardProps) => {
     const brand = brands.find((b) => b.id === product.brandId);
     const type = productTypes.find((t) => t.id === product.productTypeId);
-    const discount = discounts.find((d) => d.id === product.discountId);
+    const discount = discounts.find((d) => d.name === product.discountName);
 
     const discountedPrice = discount ? product.salePrice * (1 - discount.percentage / 100) : product.salePrice;
 
