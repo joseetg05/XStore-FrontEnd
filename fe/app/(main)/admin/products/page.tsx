@@ -14,13 +14,14 @@ import { Toolbar } from 'primereact/toolbar';
 import { classNames } from 'primereact/utils';
 
 import { Brand, Discount, Product, ProductService, ProductType } from '../../../../service/ProductService';
+import { DiscountService } from '../../../../service/DiscountService';
 
 const emptyProduct: Omit<Product, 'id'> = {
     productTypeId: 1,
     brandId: 1,
     imageUrl: '',
     description: '',
-    discountId: 0,
+    discountName: '',
     purchasePrice: 0,
     salePrice: 0,
     status: true
@@ -45,7 +46,7 @@ const AdminProductsPage = () => {
 
     const [types, setTypes] = useState<ProductType[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
-    const [discounts, setDiscounts] = useState<Discount[]>([]);
+    const [discounts, setDiscounts] = useState<{ name: string; label: string }[]>([]);
 
     useEffect(() => {
         loadData();
@@ -55,7 +56,10 @@ const AdminProductsPage = () => {
         ProductService.getAllProducts().then(data => setProducts(data));
         ProductService.getProductTypes().then(data => setTypes(data));
         ProductService.getBrands().then(data => setBrands(data));
-        ProductService.getDiscounts().then(data => setDiscounts(data));
+        DiscountService.getActive().then(data => setDiscounts([
+            { name: '', label: 'Sin descuento' },
+            ...data.map(d => ({ name: d.name, label: `${d.name} (${d.percentage}%)` }))
+        ]));
     };
 
     const openNew = () => {
@@ -323,14 +327,14 @@ const AdminProductsPage = () => {
 
                         <div className="formgrid grid">
                             <div className="field col-6">
-                                <label htmlFor="discountId">Descuento</label>
+                                <label htmlFor="discountName">Descuento</label>
                                 <Dropdown
-                                    id="discountId"
-                                    value={product.discountId}
-                                    options={[{ id: 0, name: 'Ninguno' }, ...discounts]}
-                                    onChange={(e) => setProduct({ ...product, discountId: e.value })}
-                                    optionLabel="name"
-                                    optionValue="id"
+                                    id="discountName"
+                                    value={product.discountName ?? ''}
+                                    options={discounts}
+                                    onChange={(e) => setProduct({ ...product, discountName: e.value })}
+                                    optionLabel="label"
+                                    optionValue="name"
                                 />
                             </div>
                             <div className="field col-6 flex align-items-center mt-4">

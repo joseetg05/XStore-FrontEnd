@@ -114,7 +114,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
         const subtotal = cartItems.reduce((sum, item) => {
-            const discount = discounts.find((d) => d.id === item.product.discountId);
+            const discount = discounts.find((d) => d.name === item.product.discountName);
             const price = discount ? item.product.salePrice * (1 - discount.percentage / 100) : item.product.salePrice;
             return sum + price * item.quantity;
         }, 0);

@@ -111,9 +111,9 @@ const CheckoutPage = () => {
         }
     }, [cartItems, isSuccess, router]);
 
-    const getItemPrice = useCallback((productId: number, salePrice: number, discountId: number) => {
-        const discount = discounts.find((d) => d.id === discountId);
-        return discount ? salePrice * (1 - discount.percentage / 100) : salePrice;
+    const getItemPrice = useCallback((salePrice: number, discountName: string) => {
+        const discount = discounts.find((d) => d.name === discountName);
+        return discount && discountName ? salePrice * (1 - discount.percentage / 100) : salePrice;
     }, [discounts]);
 
     const validate = (): boolean => {
@@ -388,7 +388,7 @@ const CheckoutPage = () => {
                         {/* Items */}
                         <div className="flex flex-column gap-2 mb-3">
                             {cartItems.map((item) => {
-                                const unitPrice = getItemPrice(item.product.id, item.product.salePrice, item.product.discountId);
+                                const unitPrice = getItemPrice(item.product.salePrice, item.product.discountName);
                                 const lineTotal = unitPrice * item.quantity;
                                 return (
                                     <div key={item.product.id} className="flex align-items-start justify-content-between gap-2">
@@ -398,7 +398,7 @@ const CheckoutPage = () => {
                                         </div>
                                         <div className="flex-shrink-0 text-right">
                                             <p className="m-0 text-900 font-medium text-sm">{formatCurrency(lineTotal)}</p>
-                                            {item.product.discountId !== 0 && (
+                                            {!!item.product.discountName && (
                                                 <span className="text-500 text-xs line-through">
                                                     {formatCurrency(item.product.salePrice * item.quantity)}
                                                 </span>

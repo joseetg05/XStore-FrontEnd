@@ -70,7 +70,7 @@ const CartSidebar = ({ visible, onHide }: CartSidebarProps) => {
                         {/* ── Item List ── */}
                         <div className="flex flex-column gap-3 flex-1 overflow-y-auto pb-3">
                             {cartItems.map((item) => {
-                                const discount = discounts.find((d) => d.id === item.product.discountId);
+                                const discount = discounts.find((d) => d.name === item.product.discountName);
                                 const unitPrice = discount ? item.product.salePrice * (1 - discount.percentage / 100) : item.product.salePrice;
                                 const lineTotal = unitPrice * item.quantity;
 

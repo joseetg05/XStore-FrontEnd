@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { Button } from 'primereact/button'
+import { Calendar } from 'primereact/calendar'
 import { Column } from 'primereact/column'
 import { DataTable } from 'primereact/datatable'
 import { Dialog } from 'primereact/dialog'
@@ -9,6 +10,7 @@ import { Dropdown } from 'primereact/dropdown'
 import { InputNumber } from 'primereact/inputnumber'
 import { InputSwitch } from 'primereact/inputswitch'
 import { InputText } from 'primereact/inputtext'
+import { InputTextarea } from 'primereact/inputtextarea'
 import { Toast } from 'primereact/toast'
 import { Toolbar } from 'primereact/toolbar'
 import { classNames } from 'primereact/utils'
@@ -18,57 +20,63 @@ import { DiscountType } from '@/types/discounttype'
 import { DiscountService } from '@/service/DiscountService'
 import { DiscountTypeService } from '@/service/DiscountTypeService'
 
-const emptyDiscount: Omit<Discount, 'id'> = {
+const today = new Date().toISOString().split('T')[0]
+
+const emptyDiscount: Discount = {
     name: '',
-    discountTypeId: 0,
+    description: '',
+    category: '',
     percentage: 10,
+    startDate: today,
+    endDate: today,
     status: true
 }
 
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+const toDate = (s: string): Date | null => (s ? new Date(s + 'T00:00:00') : null)
+const fromDate = (d: Date | null): string => (d ? d.toISOString().split('T')[0] : '')
+
 const AdminDiscountsPage = () => {
     const [discounts, setDiscounts] = useState<Discount[]>([])
-    const [activeDiscountTypes, setActiveDiscountTypes] = useState<DiscountType[]>([])
-    const [discountTypeMap, setDiscountTypeMap] = useState<Map<number, string>>(new Map())
+    const [activeCategories, setActiveCategories] = useState<DiscountType[]>([])
 
     const [discountDialog, setDiscountDialog] = useState(false)
-    const [deleteDialog, setDeleteDialog] = useState(false)
-    const [discount, setDiscount] = useState<Partial<Discount>>(emptyDiscount)
+    const [discount, setDiscount] = useState<Discount>(emptyDiscount)
     const [submitted, setSubmitted] = useState(false)
     const [globalFilter, setGlobalFilter] = useState('')
     const toast = useRef<Toast>(null)
     const dt = useRef<DataTable<Discount[]>>(null)
+    const editingName = useRef<string>('')
 
     useEffect(() => {
         loadData()
     }, [])
 
     const loadData = () => {
-        Promise.all([
-            DiscountService.getAll(),
-            DiscountTypeService.getAll(),
-            DiscountTypeService.getActiveDiscountTypes()
-        ]).then(([discountsData, allTypes, activeTypes]) => {
+        Promise.all([DiscountService.getAll(), DiscountTypeService.getActiveDiscountTypes()]).then(([discountsData, activeTypes]) => {
             setDiscounts(discountsData)
-            setActiveDiscountTypes(activeTypes)
-            const map = new Map<number, string>()
-            allTypes.forEach((t) => map.set(t.id, t.name))
-            setDiscountTypeMap(map)
+            setActiveCategories(activeTypes)
         })
     }
 
     // ─── Validation ────────────────────────────────────────────────────────────
 
-    const hasValidationErrors = () => {
-        if (!discount.name?.trim()) return true
-        if (!discount.discountTypeId) return true
-        const pct = discount.percentage ?? 0
-        if (pct < 1 || pct > 100) return true
+    const hasErrors = () => {
+        if (!discount.name.trim()) return true
+        if (!discount.description.trim()) return true
+        if (!discount.category) return true
+        if (discount.percentage < 1 || discount.percentage > 100) return true
+        if (!discount.startDate) return true
+        if (!discount.endDate) return true
+        if (discount.endDate < discount.startDate) return true
         return false
     }
 
     // ─── CRUD Actions ──────────────────────────────────────────────────────────
 
     const openNew = () => {
+        editingName.current = ''
         setDiscount(emptyDiscount)
         setSubmitted(false)
         setDiscountDialog(true)
@@ -79,17 +87,13 @@ const AdminDiscountsPage = () => {
         setDiscountDialog(false)
     }
 
-    const hideDeleteDialog = () => {
-        setDeleteDialog(false)
-    }
-
     const saveDiscount = async () => {
         setSubmitted(true)
-        if (hasValidationErrors()) return
+        if (hasErrors()) return
 
         let result
-        if (discount.id) {
-            result = await DiscountService.update(discount as Discount)
+        if (editingName.current) {
+            result = await DiscountService.update(editingName.current, discount)
             if (result.success) {
                 toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Descuento actualizado correctamente', life: 3000 })
             } else {
@@ -97,7 +101,7 @@ const AdminDiscountsPage = () => {
                 return
             }
         } else {
-            result = await DiscountService.create(discount as Omit<Discount, 'id'>)
+            result = await DiscountService.create(discount)
             if (result.success) {
                 toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Descuento creado correctamente', life: 3000 })
             } else {
@@ -112,33 +116,16 @@ const AdminDiscountsPage = () => {
     }
 
     const editDiscount = (d: Discount) => {
+        editingName.current = d.name
         setDiscount({ ...d })
         setSubmitted(false)
         setDiscountDialog(true)
     }
 
-    const confirmDelete = (d: Discount) => {
-        setDiscount({ ...d })
-        setDeleteDialog(true)
-    }
-
-    const deleteDiscount = async () => {
-        if (!discount.id) return
-        const res = await DiscountService.delete(discount.id)
-        if (res.success) {
-            toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Descuento eliminado correctamente', life: 3000 })
-            loadData()
-        } else {
-            toast.current?.show({ severity: 'error', summary: 'Error', detail: res.error, life: 3000 })
-        }
-        setDeleteDialog(false)
-        setDiscount(emptyDiscount)
-    }
-
     const toggleStatus = async (d: Discount) => {
-        const res = await DiscountService.toggleStatus(d.id)
+        const res = await DiscountService.toggleStatus(d.name, d.status)
         if (res.success) {
-            toast.current?.show({ severity: 'info', summary: 'Estado actualizado', detail: `"${d.name}" ahora está ${res.discount?.status ? 'activo' : 'inactivo'}`, life: 2500 })
+            toast.current?.show({ severity: 'info', summary: 'Estado actualizado', detail: `"${d.name}" ahora está ${!d.status ? 'activo' : 'inactivo'}`, life: 2500 })
             loadData()
         } else {
             toast.current?.show({ severity: 'error', summary: 'Error', detail: res.error, life: 3000 })
@@ -147,21 +134,13 @@ const AdminDiscountsPage = () => {
 
     // ─── Column Templates ──────────────────────────────────────────────────────
 
-    const discountTypeBodyTemplate = (rowData: Discount) =>
-        discountTypeMap.get(rowData.discountTypeId) ?? `(ID: ${rowData.discountTypeId})`
-
     const percentageBodyTemplate = (rowData: Discount) => `${rowData.percentage}%`
 
-    const statusBodyTemplate = (rowData: Discount) => (
-        <InputSwitch checked={rowData.status} onChange={() => toggleStatus(rowData)} />
-    )
+    const datesBodyTemplate = (rowData: Discount) => `${rowData.startDate} → ${rowData.endDate}`
 
-    const actionBodyTemplate = (rowData: Discount) => (
-        <>
-            <Button icon="pi pi-pencil" rounded severity="success" className="mr-2" onClick={() => editDiscount(rowData)} />
-            <Button icon="pi pi-trash" rounded severity="warning" onClick={() => confirmDelete(rowData)} />
-        </>
-    )
+    const statusBodyTemplate = (rowData: Discount) => <InputSwitch checked={rowData.status} onChange={() => toggleStatus(rowData)} />
+
+    const actionBodyTemplate = (rowData: Discount) => <Button icon="pi pi-pencil" rounded severity="success" onClick={() => editDiscount(rowData)} />
 
     const leftToolbarTemplate = () => (
         <div className="my-2">
@@ -186,15 +165,8 @@ const AdminDiscountsPage = () => {
         </>
     )
 
-    const deleteDialogFooter = (
-        <>
-            <Button label="No" icon="pi pi-times" text onClick={hideDeleteDialog} />
-            <Button label="Sí" icon="pi pi-check" text onClick={deleteDiscount} />
-        </>
-    )
-
-    const pct = discount.percentage ?? 0
-    const percentageInvalid = submitted && (pct < 1 || pct > 100)
+    const pctInvalid = submitted && (discount.percentage < 1 || discount.percentage > 100)
+    const dateInvalid = submitted && !!discount.startDate && !!discount.endDate && discount.endDate < discount.startDate
 
     // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -208,66 +180,79 @@ const AdminDiscountsPage = () => {
                     <DataTable
                         ref={dt}
                         value={discounts}
-                        dataKey="id"
+                        dataKey="name"
                         paginator
                         rows={10}
                         rowsPerPageOptions={[5, 10, 25]}
                         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                         currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} descuentos"
                         globalFilter={globalFilter}
-                        globalFilterFields={['name']}
+                        globalFilterFields={['name', 'category', 'description']}
                         emptyMessage="No se encontraron descuentos."
                         header={header}
                         responsiveLayout="scroll"
                     >
-                        <Column field="id" header="ID" sortable headerStyle={{ minWidth: '5rem' }} />
                         <Column field="name" header="Nombre" sortable headerStyle={{ minWidth: '14rem' }} />
-                        <Column header="Tipo de Descuento" body={discountTypeBodyTemplate} sortable sortField="discountTypeId" headerStyle={{ minWidth: '14rem' }} />
+                        <Column field="category" header="Categoría" sortable headerStyle={{ minWidth: '12rem' }} />
+                        <Column field="description" header="Descripción" headerStyle={{ minWidth: '14rem' }} />
                         <Column header="Porcentaje" body={percentageBodyTemplate} sortable sortField="percentage" headerStyle={{ minWidth: '10rem' }} />
+                        <Column header="Vigencia" body={datesBodyTemplate} headerStyle={{ minWidth: '16rem' }} />
                         <Column field="status" header="Activo" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '8rem' }} />
-                        <Column body={actionBodyTemplate} headerStyle={{ minWidth: '10rem' }} />
+                        <Column body={actionBodyTemplate} headerStyle={{ minWidth: '8rem' }} />
                     </DataTable>
 
                     {/* CREATE / EDIT DIALOG */}
                     <Dialog
                         visible={discountDialog}
-                        style={{ width: '480px' }}
-                        header={discount.id ? 'Editar Descuento' : 'Nuevo Descuento'}
+                        style={{ width: '500px' }}
+                        header={editingName.current ? 'Editar Descuento' : 'Nuevo Descuento'}
                         modal
                         className="p-fluid"
                         footer={dialogFooter}
                         onHide={hideDialog}
                     >
                         <div className="field">
-                            <label htmlFor="name">Nombre</label>
+                            <label htmlFor="name">Nombre Comercial</label>
                             <InputText
                                 id="name"
-                                value={discount.name || ''}
+                                value={discount.name}
                                 onChange={(e) => setDiscount({ ...discount, name: e.target.value })}
                                 required
                                 autoFocus
-                                className={classNames({ 'p-invalid': submitted && !discount.name?.trim() })}
+                                className={classNames({ 'p-invalid': submitted && !discount.name.trim() })}
                             />
-                            {submitted && !discount.name?.trim() && <small className="p-error">El nombre es obligatorio.</small>}
+                            {submitted && !discount.name.trim() && <small className="p-error">El nombre es obligatorio.</small>}
                         </div>
 
                         <div className="field">
-                            <label htmlFor="discountTypeId">Tipo de Descuento</label>
-                            {activeDiscountTypes.length === 0 ? (
-                                <small className="p-error block">No hay tipos de descuento activos. Active al menos uno antes de crear un descuento.</small>
+                            <label htmlFor="description">Descripción</label>
+                            <InputTextarea
+                                id="description"
+                                value={discount.description}
+                                onChange={(e) => setDiscount({ ...discount, description: e.target.value })}
+                                rows={3}
+                                className={classNames({ 'p-invalid': submitted && !discount.description.trim() })}
+                            />
+                            {submitted && !discount.description.trim() && <small className="p-error">La descripción es obligatoria.</small>}
+                        </div>
+
+                        <div className="field">
+                            <label htmlFor="category">Categoría</label>
+                            {activeCategories.length === 0 ? (
+                                <small className="p-error block">No hay categorías de descuento activas.</small>
                             ) : (
                                 <>
                                     <Dropdown
-                                        id="discountTypeId"
-                                        value={discount.discountTypeId || null}
-                                        options={activeDiscountTypes}
-                                        onChange={(e) => setDiscount({ ...discount, discountTypeId: e.value })}
+                                        id="category"
+                                        value={discount.category || null}
+                                        options={activeCategories}
+                                        onChange={(e) => setDiscount({ ...discount, category: e.value })}
                                         optionLabel="name"
-                                        optionValue="id"
-                                        placeholder="Seleccione un tipo"
-                                        className={classNames({ 'p-invalid': submitted && !discount.discountTypeId })}
+                                        optionValue="name"
+                                        placeholder="Seleccione una categoría"
+                                        className={classNames({ 'p-invalid': submitted && !discount.category })}
                                     />
-                                    {submitted && !discount.discountTypeId && <small className="p-error">El tipo de descuento es obligatorio.</small>}
+                                    {submitted && !discount.category && <small className="p-error">La categoría es obligatoria.</small>}
                                 </>
                             )}
                         </div>
@@ -276,43 +261,49 @@ const AdminDiscountsPage = () => {
                             <label htmlFor="percentage">Porcentaje (%)</label>
                             <InputNumber
                                 id="percentage"
-                                value={discount.percentage ?? 10}
+                                value={discount.percentage}
                                 onValueChange={(e) => setDiscount({ ...discount, percentage: e.value ?? 1 })}
                                 min={1}
                                 max={100}
                                 suffix="%"
                                 showButtons
-                                className={classNames({ 'p-invalid': percentageInvalid })}
+                                className={classNames({ 'p-invalid': pctInvalid })}
                             />
-                            {percentageInvalid && <small className="p-error">El porcentaje debe estar entre 1 y 100.</small>}
+                            {pctInvalid && <small className="p-error">El porcentaje debe estar entre 1 y 100.</small>}
+                        </div>
+
+                        <div className="formgrid grid">
+                            <div className="field col">
+                                <label htmlFor="startDate">Fecha Inicio</label>
+                                <Calendar
+                                    id="startDate"
+                                    value={toDate(discount.startDate)}
+                                    onChange={(e) => setDiscount({ ...discount, startDate: fromDate(e.value as Date | null) })}
+                                    dateFormat="yy-mm-dd"
+                                    showIcon
+                                    className={classNames({ 'p-invalid': submitted && !discount.startDate })}
+                                />
+                                {submitted && !discount.startDate && <small className="p-error">La fecha de inicio es obligatoria.</small>}
+                            </div>
+
+                            <div className="field col">
+                                <label htmlFor="endDate">Fecha Final</label>
+                                <Calendar
+                                    id="endDate"
+                                    value={toDate(discount.endDate)}
+                                    onChange={(e) => setDiscount({ ...discount, endDate: fromDate(e.value as Date | null) })}
+                                    dateFormat="yy-mm-dd"
+                                    showIcon
+                                    className={classNames({ 'p-invalid': submitted && (!discount.endDate || dateInvalid) })}
+                                />
+                                {submitted && !discount.endDate && <small className="p-error">La fecha final es obligatoria.</small>}
+                                {dateInvalid && <small className="p-error">La fecha final debe ser mayor o igual a la de inicio.</small>}
+                            </div>
                         </div>
 
                         <div className="field flex align-items-center gap-3">
                             <label htmlFor="status" className="mb-0">Activo</label>
-                            <InputSwitch
-                                id="status"
-                                checked={discount.status ?? true}
-                                onChange={(e) => setDiscount({ ...discount, status: e.value })}
-                            />
-                        </div>
-                    </Dialog>
-
-                    {/* DELETE CONFIRM DIALOG */}
-                    <Dialog
-                        visible={deleteDialog}
-                        style={{ width: '450px' }}
-                        header="Confirmar eliminación"
-                        modal
-                        footer={deleteDialogFooter}
-                        onHide={hideDeleteDialog}
-                    >
-                        <div className="flex align-items-center justify-content-center">
-                            <i className="pi pi-exclamation-triangle mr-3" style={{ fontSize: '2rem' }} />
-                            {discount && (
-                                <span>
-                                    ¿Estás seguro de que quieres eliminar <b>{discount.name}</b>?
-                                </span>
-                            )}
+                            <InputSwitch id="status" checked={discount.status} onChange={(e) => setDiscount({ ...discount, status: e.value })} />
                         </div>
                     </Dialog>
                 </div>
