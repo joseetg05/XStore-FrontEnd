@@ -5,7 +5,8 @@ import { CartProvider } from '../../context/CartContext';
 import Layout from '../../layout/layout';
 import { AuthService } from '../../service/AuthService';
 
-const PUBLIC_ROUTES = ['/products'];
+const PUBLIC_ROUTES = ['/shop'];
+const AUTH_ROUTES = ['/checkout']; // accesibles para cualquier usuario logueado
 
 interface AppLayoutProps {
     children: React.ReactNode;
@@ -16,8 +17,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     const pathname = usePathname();
 
     useEffect(() => {
-        const isPublic = PUBLIC_ROUTES.includes(pathname);
-        if (isPublic) return;
+        if (PUBLIC_ROUTES.includes(pathname)) return;
 
         const user = AuthService.getCurrentUser();
 
@@ -26,9 +26,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
             return;
         }
 
+        if (AUTH_ROUTES.includes(pathname)) return;
+
         const accesos = user.accesos ? user.accesos.split(',').map((r) => r.trim()) : [];
         if (!accesos.includes(pathname)) {
-            router.replace('/products');
+            router.replace('/shop');
         }
     }, [pathname, router]);
 
