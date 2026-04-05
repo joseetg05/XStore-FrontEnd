@@ -27,6 +27,7 @@ const SYSTEM_ROUTES = [
     { label: 'Descuentos', value: '/admin/discounts' },
     { label: 'Inventario', value: '/admin/inventory' },
     { label: 'Ubicaciones', value: '/admin/inventory-locations' },
+    { label: 'Proveedores', value: '/admin/suppliers' },
     { label: 'Roles', value: '/admin/roles' }
 ]
 
