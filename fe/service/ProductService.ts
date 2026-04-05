@@ -1,3 +1,4 @@
+import { apiCall, getCurrentUsername } from './ApiClient'
 import { BrandService } from './BrandService'
 import { ProductTypeService } from './ProductTypeService'
 import { DiscountService } from './DiscountService'
@@ -5,211 +6,97 @@ import { DiscountService } from './DiscountService'
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 export interface ProductType {
-    id: number;
-    name: string;
+    id: number
+    name: string
 }
 
 export interface Brand {
-    id: number;
-    name: string;
+    id: number
+    name: string
 }
 
 export interface Discount {
-    name: string;
-    percentage: number;
+    name: string
+    description: string
+    percentage: number
 }
 
-/**
- * Maps to the backend table columns:
- * PRD_ID, PRD_TIPO_PRD_ID, PRD_MARCA_PRD_ID, PRD_RutaImagen,
- * PRD_Descripcion, PRD_DESC_ID, PRD_PrecioCompra, PRD_PrecioVenta, PRD_Estado
- */
 export interface Product {
-    id: number;
-    productTypeId: number;
-    brandId: number;
-    imageUrl: string;
-    description: string;
-    discountName: string;
-    purchasePrice: number;
-    salePrice: number;
-    status: boolean;
+    id: number
+    imageUrl: string
+    description: string
+    type: string        // nombre del tipo de producto
+    brand: string       // nombre de la marca
+    provider: string    // nombre del proveedor
+    purchasePrice: number
+    salePrice: number
+    location: string    // nombre de la ubicación
+    stock: number
+    discountName: string
+    status: boolean
 }
 
 export interface ProductFilters {
-    productTypeId?: number | null;
-    brandId?: number | null;
-    search?: string;
-    sortBy?: 'price' | 'description';
-    sortOrder?: 'asc' | 'desc';
+    type?: string | null
+    brand?: string | null
+    search?: string
+    sortBy?: 'price' | 'description'
+    sortOrder?: 'asc' | 'desc'
 }
 
 export interface ProductResult {
-    success: boolean;
-    product?: Product;
-    error?: string;
+    success: boolean
+    product?: Product
+    error?: string
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Create payload (campos adicionales solo para creación) ──────────────────
 
-const MOCK_PRODUCT_TYPES: ProductType[] = [
-    { id: 1, name: 'Celulares' },
-    { id: 2, name: 'Ropa' },
-    { id: 3, name: 'Accesorios' },
-    { id: 4, name: 'Hogar y Jardín' }
-];
+export interface CreateProductPayload {
+    imageUrl: string
+    description: string
+    type: string
+    brand: string
+    provider: string
+    purchasePrice: number
+    salePrice: number
+    location: string
+    entryQuantity: number
+    minStock: number
+    discountName: string
+}
 
-const MOCK_BRANDS: Brand[] = [
-    { id: 1, name: 'Apple' },
-    { id: 2, name: 'Motorola' },
-    { id: 3, name: 'Nike' },
-    { id: 4, name: 'Adidas' },
-    { id: 5, name: 'IKEA' },
-    { id: 6, name: 'Sony' }
-];
+// ─── API shape ────────────────────────────────────────────────────────────────
 
+interface ApiProduct {
+    'Descripción': string
+    'Ruta Imagen': string
+    'Tipo Producto': string
+    'Marca': string
+    'Proveedor': string
+    'Precio Compra': number
+    'Precio Venta': number
+    'Precio Con Descuento': number
+    'Descuento Asignado': string | null
+    'Descuento %': string | null
+    'Descuento Vigente Hoy': string
+    'Estado': string
+}
 
-const MOCK_PRODUCTS: Product[] = [
-    {
-        id: 1,
-        productTypeId: 1,
-        brandId: 1,
-        imageUrl: '/layout/images/products/iPhone 15 Pro 8GB + 256GB Negro.png',
-        description: 'iPhone 15 Pro 8GB + 256GB Negro',
-        discountName: 'Oferta de Lanzamiento 10%',
-        purchasePrice: 700000,
-        salePrice: 1009900,
-        status: true
-    },
-    {
-        id: 2,
-        productTypeId: 1,
-        brandId: 2,
-        imageUrl: '/layout/images/products/Motorola G56 8GB + 256GB Verde.png',
-        description: 'Motorola G56 8GB + 256GB Verde',
-        discountName: 'Liquidación de Temporada 25%',
-        purchasePrice: 60000,
-        salePrice: 99895,
-        status: true
-    },
-    {
-        id: 3,
-        productTypeId: 2,
-        brandId: 6,
-        imageUrl: 'https://via.placeholder.com/300x200?text=Sony+WH-1000XM5',
-        description: 'Sony WH-1000XM5',
-        discountName: 'Liquidación de Temporada 25%',
-        purchasePrice: 200,
-        salePrice: 349,
-        status: true
-    },
-    {
-        id: 4,
-        productTypeId: 2,
-        brandId: 3,
-        imageUrl: 'https://via.placeholder.com/300x200?text=Nike+Air+Max',
-        description: 'Nike Air Max',
-        discountName: '',
-        purchasePrice: 60,
-        salePrice: 120,
-        status: true
-    },
-    {
-        id: 5,
-        productTypeId: 2,
-        brandId: 4,
-        imageUrl: 'https://via.placeholder.com/300x200?text=Adidas+Ultraboost',
-        description: 'Adidas Ultraboost',
-        discountName: 'Oferta de Lanzamiento 10%',
-        purchasePrice: 80,
-        salePrice: 180,
-        status: true
-    },
-    {
-        id: 6,
-        productTypeId: 3,
-        brandId: 1,
-        imageUrl: 'https://via.placeholder.com/300x200?text=Apple+Watch+S9',
-        description: 'Apple Watch S9',
-        discountName: '',
-        purchasePrice: 250,
-        salePrice: 399,
-        status: true
-    },
-    {
-        id: 7,
-        productTypeId: 3,
-        brandId: 3,
-        imageUrl: 'https://via.placeholder.com/300x200?text=Nike+Cap',
-        description: 'Gorra Nike',
-        discountName: '',
-        purchasePrice: 12,
-        salePrice: 30,
-        status: true
-    },
-    {
-        id: 8,
-        productTypeId: 4,
-        brandId: 5,
-        imageUrl: 'https://via.placeholder.com/300x200?text=IKEA+KALLAX',
-        description: 'IKEA KALLAX',
-        discountName: '',
-        purchasePrice: 40,
-        salePrice: 79,
-        status: true
-    },
-    {
-        id: 9,
-        productTypeId: 1,
-        brandId: 2,
-        imageUrl: 'https://via.placeholder.com/300x200?text=Samsung+TV+55',
-        description: 'Samsung TV 55"',
-        discountName: '',
-        purchasePrice: 350,
-        salePrice: 699,
-        status: false // inactive — should NOT appear in catalog
-    },
-    {
-        id: 10,
-        productTypeId: 2,
-        brandId: 4,
-        imageUrl: 'https://via.placeholder.com/300x200?text=Adidas+T-Shirt',
-        description: 'Camiseta Adidas',
-        discountName: 'Descuento Especial 50%',
-        purchasePrice: 15,
-        salePrice: 35,
-        status: true
-    }
-];
-
-// ─── localStorage Helpers ─────────────────────────────────────────────────────
-
-const PRODUCTS_STORAGE_KEY = 'xstore-products';
-
-const loadProducts = (): Product[] => {
-    try {
-        if (typeof window === 'undefined') return MOCK_PRODUCTS;
-        const raw = localStorage.getItem(PRODUCTS_STORAGE_KEY);
-        if (!raw) {
-            // Seed localStorage with mock data on first load
-            localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(MOCK_PRODUCTS));
-            return MOCK_PRODUCTS;
-        }
-        return JSON.parse(raw) as Product[];
-    } catch {
-        return MOCK_PRODUCTS;
-    }
-};
-
-const saveProducts = (products: Product[]): void => {
-    try {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
-        }
-    } catch {
-        // Silently fail if localStorage is unavailable
-    }
-};
+const fromApi = (p: ApiProduct, index: number): Product => ({
+    id: index + 1,
+    imageUrl: p['Ruta Imagen'],
+    description: p['Descripción'],
+    type: p['Tipo Producto'],
+    brand: p['Marca'],
+    provider: p['Proveedor'],
+    purchasePrice: p['Precio Compra'],
+    salePrice: p['Precio Venta'],
+    location: '',
+    stock: 0,
+    discountName: p['Descuento Vigente Hoy'] === 'Sí' ? (p['Descuento Asignado'] ?? '') : '',
+    status: p['Estado'] === 'Activo'
+})
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -224,129 +111,73 @@ export const ProductService = {
 
     async getDiscounts(): Promise<Discount[]> {
         const active = await DiscountService.getActive()
-        return active.map((d) => ({ name: d.name, percentage: d.percentage }))
+        return active.map((d) => ({ name: d.name, description: d.description, percentage: d.percentage }))
     },
 
-    /**
-     * Retorna TODOS los productos (activos e inactivos).
-     * Usado por el panel de administración.
-     *
-     * TODO: habilitar cuando exista backend real
-     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products`).then(r => r.json());
-     */
-    getAllProducts(): Promise<Product[]> {
-        return Promise.resolve(loadProducts());
+    async getAllProducts(): Promise<Product[]> {
+        const u = getCurrentUsername()
+        if (!u) return []
+        try {
+            const data = await apiCall<ApiProduct[]>('GET', `/api/productos?nombreUsuario=${u}`)
+            return (data ?? []).map((p, i) => fromApi(p, i))
+        } catch {
+            return []
+        }
     },
 
-    /**
-     * Retorna solo los productos activos (status === true).
-     * Usado por el catálogo público.
-     *
-     * TODO: habilitar cuando exista backend real
-     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?status=active`).then(r => r.json());
-     */
-    getActiveProducts(filters?: ProductFilters): Promise<Product[]> {
-        let results = loadProducts().filter((p) => p.status === true);
+    async getActiveProducts(filters?: ProductFilters): Promise<Product[]> {
+        const u = getCurrentUsername()
+        if (!u) return []
+        try {
+            const params = new URLSearchParams({ nombreUsuario: u })
+            if (filters?.search) params.append('filtroDescripcion', filters.search)
+            if (filters?.type) params.append('filtroTipo', filters.type)
+            if (filters?.brand) params.append('filtroMarca', filters.brand)
 
-        if (filters?.productTypeId) {
-            results = results.filter((p) => p.productTypeId === filters.productTypeId);
-        }
-        if (filters?.brandId) {
-            results = results.filter((p) => p.brandId === filters.brandId);
-        }
-        if (filters?.search && filters.search.trim() !== '') {
-            const query = filters.search.trim().toLowerCase();
-            results = results.filter((p) => p.description.toLowerCase().includes(query));
-        }
-        if (filters?.sortBy) {
-            const order = filters.sortOrder === 'desc' ? -1 : 1;
-            const field = filters.sortBy === 'price' ? 'salePrice' : 'description';
-            results.sort((a, b) => {
-                const valA = a[field as keyof Product];
-                const valB = b[field as keyof Product];
-                if (typeof valA === 'string' && typeof valB === 'string') return valA.localeCompare(valB) * order;
-                if (typeof valA === 'number' && typeof valB === 'number') return (valA - valB) * order;
-                return 0;
-            });
-        }
+            const data = await apiCall<ApiProduct[]>('GET', `/api/productos?${params}`)
+            let results = (data ?? []).map((p, i) => fromApi(p, i)).filter((p) => p.status)
 
-        return Promise.resolve(results);
+            if (filters?.sortBy) {
+                const order = filters.sortOrder === 'desc' ? -1 : 1
+                const field = filters.sortBy === 'price' ? 'salePrice' : 'description'
+                results.sort((a, b) => {
+                    const va = a[field as keyof Product]
+                    const vb = b[field as keyof Product]
+                    if (typeof va === 'string' && typeof vb === 'string') return va.localeCompare(vb) * order
+                    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * order
+                    return 0
+                })
+            }
+
+            return results
+        } catch {
+            return []
+        }
     },
 
-    /**
-     * Alias for backwards compatibility — delegates to getActiveProducts with filters.
-     */
     getProducts(filters?: ProductFilters): Promise<Product[]> {
-        return ProductService.getActiveProducts(filters);
+        return ProductService.getActiveProducts(filters)
     },
 
-    /**
-     * Creates a new product and persists it.
-     *
-     * TODO: habilitar cuando exista backend real
-     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products`, {
-     *   method: 'POST', headers: { 'Content-Type': 'application/json' },
-     *   body: JSON.stringify(productData)
-     * }).then(r => r.json());
-     */
-    createProduct(productData: Omit<Product, 'id'>): Promise<ProductResult> {
-        const products = loadProducts();
-        const newId = products.length > 0 ? Math.max(...products.map((p) => p.id)) + 1 : 1;
-        const newProduct: Product = { id: newId, ...productData };
-        products.push(newProduct);
-        saveProducts(products);
-        return Promise.resolve({ success: true, product: newProduct });
-    },
-
-    /**
-     * Updates an existing product and persists the change.
-     *
-     * TODO: habilitar cuando exista backend real
-     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products/${product.id}`, {
-     *   method: 'PUT', headers: { 'Content-Type': 'application/json' },
-     *   body: JSON.stringify(product)
-     * }).then(r => r.json());
-     */
-    updateProduct(product: Product): Promise<ProductResult> {
-        const products = loadProducts();
-        const index = products.findIndex((p) => p.id === product.id);
-        if (index === -1) return Promise.resolve({ success: false, error: 'Producto no encontrado.' });
-        products[index] = product;
-        saveProducts(products);
-        return Promise.resolve({ success: true, product });
-    },
-
-    /**
-     * Deletes a product by ID.
-     *
-     * TODO: habilitar cuando exista backend real
-     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products/${id}`, {
-     *   method: 'DELETE'
-     * }).then(r => r.json());
-     */
-    deleteProduct(id: number): Promise<{ success: boolean; error?: string }> {
-        const products = loadProducts();
-        const index = products.findIndex((p) => p.id === id);
-        if (index === -1) return Promise.resolve({ success: false, error: 'Producto no encontrado.' });
-        products.splice(index, 1);
-        saveProducts(products);
-        return Promise.resolve({ success: true });
-    },
-
-    /**
-     * Toggles the status (active/inactive) of a product.
-     *
-     * TODO: habilitar cuando exista backend real
-     * return fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/products/${id}/toggle-status`, {
-     *   method: 'PATCH'
-     * }).then(r => r.json());
-     */
-    toggleProductStatus(id: number): Promise<ProductResult> {
-        const products = loadProducts();
-        const index = products.findIndex((p) => p.id === id);
-        if (index === -1) return Promise.resolve({ success: false, error: 'Producto no encontrado.' });
-        products[index] = { ...products[index], status: !products[index].status };
-        saveProducts(products);
-        return Promise.resolve({ success: true, product: products[index] });
+    async createProduct(payload: CreateProductPayload): Promise<ProductResult> {
+        try {
+            await apiCall('POST', '/api/productos', {
+                nombreUsuario: getCurrentUsername(),
+                rutaImagen: payload.imageUrl,
+                descripcion: payload.description,
+                tipoProducto: payload.type,
+                marcaProducto: payload.brand,
+                nombreProveedor: payload.provider,
+                precioCompra: payload.purchasePrice,
+                precioVenta: payload.salePrice,
+                nombreUbicacion: payload.location,
+                cantidadIngreso: payload.entryQuantity,
+                stockMinimo: payload.minStock,
+                nombreDescuento: payload.discountName || null
+            })
+            return { success: true }
+        } catch (e: unknown) {
+            return { success: false, error: (e as Error).message }
+        }
     }
-};
+}

@@ -19,7 +19,7 @@ import { RoleService } from '@/service/RoleService'
 
 const SYSTEM_ROUTES = [
     { label: 'Dashboard', value: '/' },
-    { label: 'Tienda (Productos)', value: '/products' },
+    { label: 'Tienda (Productos)', value: '/shop' },
     { label: 'Gestión de Productos', value: '/admin/products' },
     { label: 'Tipos de Producto', value: '/admin/product-types' },
     { label: 'Marcas', value: '/admin/brands' },

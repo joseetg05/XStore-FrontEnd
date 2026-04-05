@@ -29,7 +29,7 @@ const AppMenu = () => {
         },
         {
             label: 'Store',
-            items: [{ label: 'Tienda', icon: 'pi pi-fw pi-shopping-bag', to: '/products' }]
+            items: [{ label: 'Tienda', icon: 'pi pi-fw pi-shopping-bag', to: '/shop' }]
         },
         {
             label: 'Admin',

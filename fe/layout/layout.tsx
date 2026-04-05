@@ -3,7 +3,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEventListener, useMountEffect, useUnmountEffect } from 'primereact/hooks';
-import React, { useContext, useEffect, useRef } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { classNames } from 'primereact/utils';
 import AppFooter from './AppFooter';
 import AppSidebar from './AppSidebar';
@@ -13,6 +13,7 @@ import { LayoutContext } from './context/layoutcontext';
 import { PrimeReactContext } from 'primereact/api';
 import { ChildContainerProps, LayoutState, AppTopbarRef } from '@/types';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { AuthService } from '@/service/AuthService';
 
 const Layout = ({ children }: ChildContainerProps) => {
     const { layoutConfig, layoutState, setLayoutState } = useContext(LayoutContext);
@@ -37,6 +38,14 @@ const Layout = ({ children }: ChildContainerProps) => {
 
     const pathname = usePathname();
     const searchParams = useSearchParams();
+
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const showSidebar = pathname !== '/checkout' && isAuthenticated;
+
+    useEffect(() => {
+        setIsAuthenticated(AuthService.isAuthenticated());
+    }, [pathname]);
+
     useEffect(() => {
         hideMenu();
         hideProfileMenu();
@@ -126,12 +135,12 @@ const Layout = ({ children }: ChildContainerProps) => {
         <React.Fragment>
             <div className={containerClass}>
                 <AppTopbar ref={topbarRef} />
-                {pathname !== '/products' && pathname !== '/checkout' && (
+                {showSidebar && (
                     <div ref={sidebarRef} className="layout-sidebar">
                         <AppSidebar />
                     </div>
                 )}
-                <div className={classNames('layout-main-container', { 'ml-0': pathname === '/products' || pathname === '/checkout' })}>
+                <div className={classNames('layout-main-container', { 'ml-0': !showSidebar })}>
                     <div className="layout-main">{children}</div>
                     <AppFooter />
                 </div>

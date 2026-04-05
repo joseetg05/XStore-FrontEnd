@@ -1,185 +1,140 @@
-'use client';
+'use client'
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Button } from 'primereact/button';
-import { Column } from 'primereact/column';
-import { DataTable } from 'primereact/datatable';
-import { Dialog } from 'primereact/dialog';
-import { Dropdown } from 'primereact/dropdown';
-import { InputNumber } from 'primereact/inputnumber';
-import { InputSwitch } from 'primereact/inputswitch';
-import { InputText } from 'primereact/inputtext';
-import { Toast } from 'primereact/toast';
-import { Toolbar } from 'primereact/toolbar';
-import { classNames } from 'primereact/utils';
+import React, { useEffect, useRef, useState } from 'react'
+import { Button } from 'primereact/button'
+import { Column } from 'primereact/column'
+import { DataTable } from 'primereact/datatable'
+import { Dialog } from 'primereact/dialog'
+import { Dropdown } from 'primereact/dropdown'
+import { InputNumber } from 'primereact/inputnumber'
+import { InputSwitch } from 'primereact/inputswitch'
+import { InputText } from 'primereact/inputtext'
+import { Toast } from 'primereact/toast'
+import { Toolbar } from 'primereact/toolbar'
+import { classNames } from 'primereact/utils'
 
-import { Brand, Discount, Product, ProductService, ProductType } from '../../../../service/ProductService';
-import { DiscountService } from '../../../../service/DiscountService';
+import { CreateProductPayload, Product, ProductService, ProductType, Brand } from '../../../../service/ProductService'
+import { DiscountService } from '../../../../service/DiscountService'
+import { InventoryLocationService } from '../../../../service/InventoryLocationService'
+import { SupplierService } from '../../../../service/SupplierService'
 
-const emptyProduct: Omit<Product, 'id'> = {
-    productTypeId: 1,
-    brandId: 1,
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface DropdownOption { name: string; label: string }
+
+const emptyForm: CreateProductPayload = {
     imageUrl: '',
     description: '',
-    discountName: '',
+    type: '',
+    brand: '',
+    provider: '',
     purchasePrice: 0,
     salePrice: 0,
-    status: true
-};
+    location: '',
+    entryQuantity: 1,
+    minStock: 1,
+    discountName: ''
+}
 
-const formatCurrency = (value: number) => {
-    return value.toLocaleString('es-CR', { style: 'currency', currency: 'CRC' });
-};
+const formatCurrency = (value: number) =>
+    value.toLocaleString('es-CR', { style: 'currency', currency: 'CRC' })
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 const AdminProductsPage = () => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [productDialog, setProductDialog] = useState(false);
-    const [deleteProductDialog, setDeleteProductDialog] = useState(false);
-    
-    // We use a partial object when editing because ID might be missing for new ones
-    const [product, setProduct] = useState<Partial<Product>>(emptyProduct);
-    
-    const [submitted, setSubmitted] = useState(false);
-    const [globalFilter, setGlobalFilter] = useState('');
-    const toast = useRef<Toast>(null);
-    const dt = useRef<DataTable<Product[]>>(null);
+    const [products, setProducts] = useState<Product[]>([])
+    const [productDialog, setProductDialog] = useState(false)
+    const [form, setForm] = useState<CreateProductPayload>(emptyForm)
+    const [submitted, setSubmitted] = useState(false)
+    const [globalFilter, setGlobalFilter] = useState('')
+    const toast = useRef<Toast>(null)
+    const dt = useRef<DataTable<Product[]>>(null)
 
-    const [types, setTypes] = useState<ProductType[]>([]);
-    const [brands, setBrands] = useState<Brand[]>([]);
-    const [discounts, setDiscounts] = useState<{ name: string; label: string }[]>([]);
+    // Dropdown options
+    const [types, setTypes] = useState<ProductType[]>([])
+    const [brands, setBrands] = useState<Brand[]>([])
+    const [providers, setProviders] = useState<string[]>([])
+    const [locations, setLocations] = useState<string[]>([])
+    const [discountOptions, setDiscountOptions] = useState<DropdownOption[]>([])
 
     useEffect(() => {
-        loadData();
-    }, []);
+        loadData()
+    }, [])
 
     const loadData = () => {
-        ProductService.getAllProducts().then(data => setProducts(data));
-        ProductService.getProductTypes().then(data => setTypes(data));
-        ProductService.getBrands().then(data => setBrands(data));
-        DiscountService.getActive().then(data => setDiscounts([
-            { name: '', label: 'Sin descuento' },
-            ...data.map(d => ({ name: d.name, label: `${d.name} (${d.percentage}%)` }))
-        ]));
-    };
+        ProductService.getAllProducts().then(setProducts)
+        ProductService.getProductTypes().then(setTypes)
+        ProductService.getBrands().then(setBrands)
+        SupplierService.getAll().then((s) => setProviders(s.map((x) => x.name)))
+        InventoryLocationService.getActiveLocations().then((l) => setLocations(l.map((x) => x.name)))
+        DiscountService.getActive().then((d) =>
+            setDiscountOptions([
+                { name: '', label: 'Sin descuento' },
+                ...d.map((x) => ({ name: x.name, label: `${x.name} (${x.percentage}%)` }))
+            ])
+        )
+    }
 
     const openNew = () => {
-        setProduct(emptyProduct);
-        setSubmitted(false);
-        setProductDialog(true);
-    };
+        setForm(emptyForm)
+        setSubmitted(false)
+        setProductDialog(true)
+    }
 
     const hideDialog = () => {
-        setSubmitted(false);
-        setProductDialog(false);
-    };
+        setSubmitted(false)
+        setProductDialog(false)
+    }
 
-    const hideDeleteProductDialog = () => {
-        setDeleteProductDialog(false);
-    };
+    const isValid = () =>
+        form.description.trim() &&
+        form.type &&
+        form.brand &&
+        form.provider &&
+        form.location &&
+        form.salePrice > 0 &&
+        form.purchasePrice >= 0 &&
+        form.entryQuantity >= 1 &&
+        form.minStock >= 1
 
     const saveProduct = async () => {
-        setSubmitted(true);
+        setSubmitted(true)
+        if (!isValid()) return
 
-        if (product.description?.trim() && product.salePrice !== undefined && product.salePrice >= 0) {
-            let result;
-            if (product.id) {
-                // Update
-                result = await ProductService.updateProduct(product as Product);
-                if (result.success) {
-                    toast.current?.show({ severity: 'success', summary: 'Exitosa', detail: 'Producto Actualizado', life: 3000 });
-                } else {
-                    toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error, life: 3000 });
-                    return;
-                }
-            } else {
-                // Create
-                result = await ProductService.createProduct(product as Omit<Product, 'id'>);
-                if (result.success) {
-                    toast.current?.show({ severity: 'success', summary: 'Exitosa', detail: 'Producto Creado', life: 3000 });
-                } else {
-                    toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error, life: 3000 });
-                    return;
-                }
-            }
-
-            setProductDialog(false);
-            setProduct(emptyProduct);
-            loadData();
+        const result = await ProductService.createProduct(form)
+        if (result.success) {
+            toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Producto registrado correctamente', life: 3000 })
+            setProductDialog(false)
+            setForm(emptyForm)
+            loadData()
+        } else {
+            toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error, life: 3000 })
         }
-    };
+    }
 
-    const editProduct = (p: Product) => {
-        setProduct({ ...p });
-        setProductDialog(true);
-    };
+    // ─── Column Templates ──────────────────────────────────────────────────────
 
-    const confirmDeleteProduct = (p: Product) => {
-        setProduct({ ...p });
-        setDeleteProductDialog(true);
-    };
+    const imageBodyTemplate = (rowData: Product) => (
+        <img
+            src={rowData.imageUrl}
+            alt={rowData.description}
+            className="shadow-2"
+            width="64"
+            onError={(e) => (e.currentTarget.src = 'https://static.thenounproject.com/png/504708-200.png')}
+        />
+    )
 
-    const deleteProductAction = async () => {
-        if (product.id) {
-            const res = await ProductService.deleteProduct(product.id);
-            if (res.success) {
-                toast.current?.show({ severity: 'success', summary: 'Exitosa', detail: 'Producto Eliminado', life: 3000 });
-                loadData();
-            } else {
-                toast.current?.show({ severity: 'error', summary: 'Error', detail: res.error, life: 3000 });
-            }
-        }
-        setDeleteProductDialog(false);
-        setProduct(emptyProduct);
-    };
+    const priceBodyTemplate = (rowData: Product) => formatCurrency(rowData.salePrice)
 
-    // ─── Templates ────────────────────────────────────────────────────────────
+    const statusBodyTemplate = (rowData: Product) => (
+        <InputSwitch checked={rowData.status} disabled />
+    )
 
-    const leftToolbarTemplate = () => {
-        return (
-            <React.Fragment>
-                <div className="my-2">
-                    <Button label="Nuevo" icon="pi pi-plus" severity="success" className="mr-2" onClick={openNew} />
-                </div>
-            </React.Fragment>
-        );
-    };
-
-    const imageBodyTemplate = (rowData: Product) => {
-        return (
-            <img 
-                src={rowData.imageUrl} 
-                alt={rowData.description} 
-                className="shadow-2" 
-                width="64"
-                onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/64?text=XStore')} 
-            />
-        );
-    };
-
-    const priceBodyTemplate = (rowData: Product) => {
-        return formatCurrency(rowData.salePrice);
-    };
-
-    const statusBodyTemplate = (rowData: Product) => {
-        return (
-            <i 
-                className={classNames('pi', {
-                    'pi-check-circle text-green-500': rowData.status,
-                    'pi-times-circle text-red-500': !rowData.status
-                })}
-                style={{ fontSize: '1.5rem' }}
-            ></i>
-        );
-    };
-
-    const actionBodyTemplate = (rowData: Product) => {
-        return (
-            <>
-                <Button icon="pi pi-pencil" rounded severity="success" className="mr-2" onClick={() => editProduct(rowData)} />
-                <Button icon="pi pi-trash" rounded severity="warning" onClick={() => confirmDeleteProduct(rowData)} />
-            </>
-        );
-    };
+    const leftToolbarTemplate = () => (
+        <div className="my-2">
+            <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />
+        </div>
+    )
 
     const header = (
         <div className="flex flex-column md:flex-row md:justify-content-between md:align-items-center">
@@ -189,28 +144,23 @@ const AdminProductsPage = () => {
                 <InputText type="search" onInput={(e) => setGlobalFilter(e.currentTarget.value)} placeholder="Buscar..." />
             </span>
         </div>
-    );
+    )
 
-    const productDialogFooter = (
+    const dialogFooter = (
         <>
             <Button label="Cancelar" icon="pi pi-times" text onClick={hideDialog} />
             <Button label="Guardar" icon="pi pi-check" text onClick={saveProduct} />
         </>
-    );
+    )
 
-    const deleteProductDialogFooter = (
-        <>
-            <Button label="No" icon="pi pi-times" text onClick={hideDeleteProductDialog} />
-            <Button label="Sí" icon="pi pi-check" text onClick={deleteProductAction} />
-        </>
-    );
+    const req = (field: boolean) => submitted && !field
 
     return (
         <div className="grid crud-demo">
             <div className="col-12">
                 <div className="card">
                     <Toast ref={toast} />
-                    <Toolbar className="mb-4" left={leftToolbarTemplate}></Toolbar>
+                    <Toolbar className="mb-4" left={leftToolbarTemplate} />
 
                     <DataTable
                         ref={dt}
@@ -222,147 +172,178 @@ const AdminProductsPage = () => {
                         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                         currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} productos"
                         globalFilter={globalFilter}
-                        globalFilterFields={['description', 'id']}
+                        globalFilterFields={['description', 'type', 'brand', 'provider']}
                         emptyMessage="No se encontraron productos."
                         header={header}
                         responsiveLayout="scroll"
                     >
-                        <Column field="id" header="ID" sortable headerStyle={{ minWidth: '5rem' }}></Column>
-                        <Column header="Imagen" body={imageBodyTemplate}></Column>
-                        <Column field="description" header="Descripción" sortable headerStyle={{ minWidth: '15rem' }}></Column>
-                        <Column field="salePrice" header="Precio" body={priceBodyTemplate} sortable headerStyle={{ minWidth: '10rem' }}></Column>
-                        <Column field="status" header="Activo" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '8rem' }}></Column>
-                        <Column body={actionBodyTemplate} headerStyle={{ minWidth: '10rem' }}></Column>
+                        <Column header="Imagen" body={imageBodyTemplate} headerStyle={{ minWidth: '5rem' }} />
+                        <Column field="description" header="Descripción" sortable headerStyle={{ minWidth: '15rem' }} />
+                        <Column field="type" header="Tipo" sortable headerStyle={{ minWidth: '10rem' }} />
+                        <Column field="brand" header="Marca" sortable headerStyle={{ minWidth: '10rem' }} />
+                        <Column field="provider" header="Proveedor" sortable headerStyle={{ minWidth: '12rem' }} />
+                        <Column field="salePrice" header="Precio Venta" body={priceBodyTemplate} sortable headerStyle={{ minWidth: '10rem' }} />
+                        <Column field="status" header="Activo" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '7rem' }} />
                     </DataTable>
 
-                    {/* CREATE / EDIT DIALOG */}
-                    <Dialog visible={productDialog} style={{ width: '600px' }} header="Detalles del Producto" modal className="p-fluid" footer={productDialogFooter} onHide={hideDialog}>
-                        {product.imageUrl && (
-                            <img 
-                                src={product.imageUrl} 
-                                alt={product.imageUrl} 
-                                width="150" 
-                                className="mt-0 mx-auto mb-5 block shadow-2"
-                                onError={(e) => (e.currentTarget.style.display = 'none')}
-                            />
-                        )}
-
+                    {/* CREATE DIALOG */}
+                    <Dialog
+                        visible={productDialog}
+                        style={{ width: '620px' }}
+                        header="Nuevo Producto"
+                        modal
+                        className="p-fluid"
+                        footer={dialogFooter}
+                        onHide={hideDialog}
+                    >
+                        {/* Descripción */}
                         <div className="field">
-                            <label htmlFor="description">Descripción</label>
+                            <label htmlFor="description">Descripción *</label>
                             <InputText
                                 id="description"
-                                value={product.description || ''}
-                                onChange={(e) => setProduct({ ...product, description: e.target.value })}
-                                required
+                                value={form.description}
+                                onChange={(e) => setForm({ ...form, description: e.target.value })}
                                 autoFocus
-                                className={classNames({ 'p-invalid': submitted && !product.description })}
+                                className={classNames({ 'p-invalid': req(!!form.description.trim()) })}
                             />
-                            {submitted && !product.description && <small className="p-error">La descripción es obligatoria.</small>}
+                            {req(!!form.description.trim()) && <small className="p-error">La descripción es obligatoria.</small>}
                         </div>
 
+                        {/* URL Imagen */}
                         <div className="field">
                             <label htmlFor="imageUrl">URL de la Imagen</label>
                             <InputText
                                 id="imageUrl"
-                                value={product.imageUrl || ''}
-                                onChange={(e) => setProduct({ ...product, imageUrl: e.target.value })}
-                                placeholder="http://..."
+                                value={form.imageUrl}
+                                onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                                placeholder="https://..."
                             />
                         </div>
 
+                        {/* Tipo / Marca */}
                         <div className="formgrid grid">
                             <div className="field col">
-                                <label htmlFor="productTypeId">Categoría (Tipo)</label>
+                                <label>Tipo de Producto *</label>
                                 <Dropdown
-                                    id="productTypeId"
-                                    value={product.productTypeId}
+                                    value={form.type || null}
                                     options={types}
-                                    onChange={(e) => setProduct({ ...product, productTypeId: e.value })}
+                                    onChange={(e) => setForm({ ...form, type: e.value })}
                                     optionLabel="name"
-                                    optionValue="id"
-                                    placeholder="Seleccione uno"
-                                />
-                            </div>
-                            <div className="field col">
-                                <label htmlFor="brandId">Marca</label>
-                                <Dropdown
-                                    id="brandId"
-                                    value={product.brandId}
-                                    options={brands}
-                                    onChange={(e) => setProduct({ ...product, brandId: e.value })}
-                                    optionLabel="name"
-                                    optionValue="id"
-                                    placeholder="Seleccione una"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="formgrid grid">
-                            <div className="field col">
-                                <label htmlFor="purchasePrice">Precio de Compra</label>
-                                <InputNumber
-                                    id="purchasePrice"
-                                    value={product.purchasePrice || 0}
-                                    onValueChange={(e) => setProduct({ ...product, purchasePrice: e.value || 0 })}
-                                    mode="currency"
-                                    currency="CRC"
-                                    locale="es-CR"
-                                />
-                            </div>
-                            <div className="field col">
-                                <label htmlFor="salePrice">Precio de Venta</label>
-                                <InputNumber
-                                    id="salePrice"
-                                    value={product.salePrice || 0}
-                                    onValueChange={(e) => setProduct({ ...product, salePrice: e.value || 0 })}
-                                    mode="currency"
-                                    currency="CRC"
-                                    locale="es-CR"
-                                    required
-                                    className={classNames({ 'p-invalid': submitted && (!product.salePrice || product.salePrice < 0) })}
-                                />
-                                {submitted && (!product.salePrice || product.salePrice < 0) && <small className="p-error">Precio de venta es obligatorio y no negativo.</small>}
-                            </div>
-                        </div>
-
-                        <div className="formgrid grid">
-                            <div className="field col-6">
-                                <label htmlFor="discountName">Descuento</label>
-                                <Dropdown
-                                    id="discountName"
-                                    value={product.discountName ?? ''}
-                                    options={discounts}
-                                    onChange={(e) => setProduct({ ...product, discountName: e.value })}
-                                    optionLabel="label"
                                     optionValue="name"
+                                    placeholder="Seleccione uno"
+                                    className={classNames({ 'p-invalid': req(!!form.type) })}
                                 />
+                                {req(!!form.type) && <small className="p-error">Requerido.</small>}
                             </div>
-                            <div className="field col-6 flex align-items-center mt-4">
-                                <label htmlFor="status" className="mr-3 mb-0">Activo</label>
-                                <InputSwitch 
-                                    id="status" 
-                                    checked={product.status || false} 
-                                    onChange={(e) => setProduct({ ...product, status: e.value })} 
+                            <div className="field col">
+                                <label>Marca *</label>
+                                <Dropdown
+                                    value={form.brand || null}
+                                    options={brands}
+                                    onChange={(e) => setForm({ ...form, brand: e.value })}
+                                    optionLabel="name"
+                                    optionValue="name"
+                                    placeholder="Seleccione una"
+                                    className={classNames({ 'p-invalid': req(!!form.brand) })}
                                 />
+                                {req(!!form.brand) && <small className="p-error">Requerido.</small>}
                             </div>
                         </div>
-                    </Dialog>
 
-                    {/* DELETE DIALOG */}
-                    <Dialog visible={deleteProductDialog} style={{ width: '450px' }} header="Confirmar" modal footer={deleteProductDialogFooter} onHide={hideDeleteProductDialog}>
-                        <div className="flex align-items-center justify-content-center">
-                            <i className="pi pi-exclamation-triangle mr-3" style={{ fontSize: '2rem' }} />
-                            {product && (
-                                <span>
-                                    ¿Estás seguro de que quieres eliminar <b>{product.description}</b>?
-                                </span>
-                            )}
+                        {/* Proveedor / Ubicación */}
+                        <div className="formgrid grid">
+                            <div className="field col">
+                                <label>Proveedor *</label>
+                                <Dropdown
+                                    value={form.provider || null}
+                                    options={providers.map((p) => ({ label: p, value: p }))}
+                                    onChange={(e) => setForm({ ...form, provider: e.value })}
+                                    placeholder="Seleccione uno"
+                                    className={classNames({ 'p-invalid': req(!!form.provider) })}
+                                />
+                                {req(!!form.provider) && <small className="p-error">Requerido.</small>}
+                            </div>
+                            <div className="field col">
+                                <label>Ubicación *</label>
+                                <Dropdown
+                                    value={form.location || null}
+                                    options={locations.map((l) => ({ label: l, value: l }))}
+                                    onChange={(e) => setForm({ ...form, location: e.value })}
+                                    placeholder="Seleccione una"
+                                    className={classNames({ 'p-invalid': req(!!form.location) })}
+                                />
+                                {req(!!form.location) && <small className="p-error">Requerido.</small>}
+                            </div>
+                        </div>
+
+                        {/* Precios */}
+                        <div className="formgrid grid">
+                            <div className="field col">
+                                <label>Precio de Compra *</label>
+                                <InputNumber
+                                    value={form.purchasePrice}
+                                    onValueChange={(e) => setForm({ ...form, purchasePrice: e.value ?? 0 })}
+                                    mode="currency"
+                                    currency="CRC"
+                                    locale="es-CR"
+                                />
+                            </div>
+                            <div className="field col">
+                                <label>Precio de Venta *</label>
+                                <InputNumber
+                                    value={form.salePrice}
+                                    onValueChange={(e) => setForm({ ...form, salePrice: e.value ?? 0 })}
+                                    mode="currency"
+                                    currency="CRC"
+                                    locale="es-CR"
+                                    className={classNames({ 'p-invalid': req(form.salePrice > 0) })}
+                                />
+                                {req(form.salePrice > 0) && <small className="p-error">Debe ser mayor a 0.</small>}
+                            </div>
+                        </div>
+
+                        {/* Cantidad ingreso / Stock mínimo */}
+                        <div className="formgrid grid">
+                            <div className="field col">
+                                <label>Cantidad de Ingreso *</label>
+                                <InputNumber
+                                    value={form.entryQuantity}
+                                    onValueChange={(e) => setForm({ ...form, entryQuantity: e.value ?? 1 })}
+                                    min={1}
+                                    showButtons
+                                    className={classNames({ 'p-invalid': req(form.entryQuantity >= 1) })}
+                                />
+                                {req(form.entryQuantity >= 1) && <small className="p-error">Debe ser al menos 1.</small>}
+                            </div>
+                            <div className="field col">
+                                <label>Stock Mínimo *</label>
+                                <InputNumber
+                                    value={form.minStock}
+                                    onValueChange={(e) => setForm({ ...form, minStock: e.value ?? 1 })}
+                                    min={1}
+                                    showButtons
+                                    className={classNames({ 'p-invalid': req(form.minStock >= 1) })}
+                                />
+                                {req(form.minStock >= 1) && <small className="p-error">Debe ser al menos 1.</small>}
+                            </div>
+                        </div>
+
+                        {/* Descuento */}
+                        <div className="field">
+                            <label>Descuento</label>
+                            <Dropdown
+                                value={form.discountName}
+                                options={discountOptions}
+                                onChange={(e) => setForm({ ...form, discountName: e.value })}
+                                optionLabel="label"
+                                optionValue="name"
+                            />
                         </div>
                     </Dialog>
                 </div>
             </div>
         </div>
-    );
-};
+    )
+}
 
-export default AdminProductsPage;
+export default AdminProductsPage

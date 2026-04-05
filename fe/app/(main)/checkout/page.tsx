@@ -107,7 +107,7 @@ const CheckoutPage = () => {
     // Redirect if cart is empty (and not yet in success state)
     useEffect(() => {
         if (!isSuccess && cartItems.length === 0) {
-            router.replace('/products');
+            router.replace('/shop');
         }
     }, [cartItems, isSuccess, router]);
 
@@ -137,7 +137,7 @@ const CheckoutPage = () => {
     };
 
     const handleContinue = () => {
-        router.push('/products');
+        router.push('/shop');
     };
 
     const handleSaveCustomer = async () => {
@@ -168,7 +168,7 @@ const CheckoutPage = () => {
                         rounded
                         tooltip="Volver a Productos"
                         tooltipOptions={{ position: 'right' }}
-                        onClick={() => router.push('/products')}
+                        onClick={() => router.push('/shop')}
                     />
                     <div>
                         <h2 className="m-0 text-900 font-bold">Finalizar Compra</h2>

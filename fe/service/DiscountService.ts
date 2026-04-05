@@ -9,7 +9,7 @@ interface ApiDiscount {
     'Categoría': string
     'Porcentaje': number
     'Fecha Inicio': string
-    'Fecha Final': string
+    'Fecha Fin': string
     'Estado': string
 }
 
@@ -17,9 +17,9 @@ const fromApi = (d: ApiDiscount): Discount => ({
     name: d['Nombre Comercial'],
     description: d['Descripción'],
     category: d['Categoría'],
-    percentage: d['Porcentaje'],
+    percentage: parseFloat(String(d['Porcentaje']).replace('%', '')),
     startDate: d['Fecha Inicio']?.split('T')[0] ?? '',
-    endDate: d['Fecha Final']?.split('T')[0] ?? '',
+    endDate: d['Fecha Fin']?.split('T')[0] ?? '',
     status: d['Estado'] === 'Activo'
 })
 
@@ -39,7 +39,8 @@ export const DiscountService = {
 
     async getActive(): Promise<Discount[]> {
         const all = await DiscountService.getAll()
-        return all.filter((d) => d.status)
+        const today = new Date().toISOString().split('T')[0]
+        return all.filter((d) => d.status && d.startDate <= today && d.endDate >= today)
     },
 
     async create(discount: Discount): Promise<DiscountResult> {

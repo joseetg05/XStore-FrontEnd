@@ -788,6 +788,8 @@ Registra una entrada de auditoría. **El frontend debe llamar este endpoint desp
 //10. Proveedores — GET /api/proveedores + GET /nombres + POST + PUT  
  //11. Categorías Descuento — GET + POST + PUT /api/cat-descuentos  
  //12. Estados de Entrega — GET + POST + PUT /api/estados-entregas  
- 13. Descuentos — GET + POST + PUT /api/descuentos ← NUEVO  
- 14. Productos — GET + POST /api/productos ← NUEVO  
+ //13. Descuentos — GET + POST + PUT /api/descuentos ← NUEVO  
+ //14. Productos — GET + POST /api/productos ← NUEVO  
  15. Auditorías — GET + POST /api/auditorias
+
+//Revisar Edicion de productos, proceder con el pago
