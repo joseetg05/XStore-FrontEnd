@@ -17,9 +17,12 @@ const AppMenu = () => {
         setAccesos(user?.accesos ? user.accesos.split(',').map((r) => r.trim()) : null);
     }, []);
 
+    // Rutas accesibles para cualquier usuario logueado (no requieren acceso explícito en el rol)
+    const AUTH_ROUTES = ['/profile'];
+
     const filterItems = (items: AppMenuItem[]): AppMenuItem[] => {
         if (!accesos) return items;
-        return items.filter((item) => !item.to || accesos.includes(item.to));
+        return items.filter((item) => !item.to || AUTH_ROUTES.includes(item.to) || accesos.includes(item.to));
     };
 
     const rawModel: AppMenuItem[] = [
@@ -29,12 +32,16 @@ const AppMenu = () => {
         },
         {
             label: 'Store',
-            items: [{ label: 'Tienda', icon: 'pi pi-fw pi-shopping-bag', to: '/shop' }]
+            items: [
+                { label: 'Tienda', icon: 'pi pi-fw pi-shopping-bag', to: '/shop' },
+                { label: 'Mi Perfil', icon: 'pi pi-fw pi-user', to: '/profile' }
+            ]
         },
         {
             label: 'Admin',
             items: [
                 { label: 'Gestión de Productos', icon: 'pi pi-fw pi-cog', to: '/admin/products' },
+                { label: 'Usuarios', icon: 'pi pi-fw pi-users', to: '/admin/users' },
                 { label: 'Tipos de Producto', icon: 'pi pi-fw pi-tags', to: '/admin/product-types' },
                 { label: 'Marcas', icon: 'pi pi-fw pi-bookmark', to: '/admin/brands' },
                 { label: 'Tipos de Descuento', icon: 'pi pi-fw pi-percentage', to: '/admin/discount-types' },

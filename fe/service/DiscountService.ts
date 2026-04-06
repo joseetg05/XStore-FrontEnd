@@ -28,7 +28,6 @@ const fromApi = (d: ApiDiscount): Discount => ({
 export const DiscountService = {
     async getAll(): Promise<Discount[]> {
         const u = getCurrentUsername()
-        if (!u) return []
         try {
             const data = await apiCall<ApiDiscount[]>('GET', `/api/descuentos?nombreUsuario=${u}`)
             return (data ?? []).map(fromApi)
