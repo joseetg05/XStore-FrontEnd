@@ -12,7 +12,6 @@ import { Tag } from 'primereact/tag';
 
 import { useCart } from '../../../context/CartContext';
 import { AuthService, User } from '../../../service/AuthService';
-import { Discount, ProductService } from '../../../service/ProductService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -71,11 +70,10 @@ const SuccessScreen = ({ onContinue }: { onContinue: () => void }) => (
 
 const CheckoutPage = () => {
     const router = useRouter();
-    const { cartItems, clearCart, getTotals } = useCart();
+    const { cartItems, clearCart, getTotals, discounts } = useCart();
     const { subtotal, total, totalItems } = getTotals();
 
     const [customer, setCustomer] = useState<User | null>(null);
-    const [discounts, setDiscounts] = useState<Discount[]>([]);
 
     // Card form state
     const [cardNumber, setCardNumber] = useState('');
@@ -101,7 +99,6 @@ const CheckoutPage = () => {
         const currentUser = AuthService.getCurrentUser();
         setCustomer(currentUser);
         setTempCustomer(currentUser ? { ...currentUser } : null);
-        ProductService.getDiscounts().then(setDiscounts);
     }, [router]);
 
     // Redirect if cart is empty (and not yet in success state)

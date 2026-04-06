@@ -3,11 +3,15 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Button } from 'primereact/button'
 import { Divider } from 'primereact/divider'
+import { Dropdown } from 'primereact/dropdown'
+import { InputSwitch } from 'primereact/inputswitch'
 import { InputText } from 'primereact/inputtext'
+import { Password } from 'primereact/password'
 import { Toast } from 'primereact/toast'
 import { classNames } from 'primereact/utils'
 
 import { PersonaUser, UserService } from '@/service/UserService'
+import { RoleService } from '@/service/RoleService'
 
 const AdminUsersPage = () => {
     const toast = useRef<Toast>(null)
@@ -16,19 +20,37 @@ const AdminUsersPage = () => {
     const [form, setForm] = useState<PersonaUser | null>(null)
     const [submitted, setSubmitted] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [savingSession, setSavingSession] = useState(false)
     const [loading, setLoading] = useState(true)
+
+    // Sesión
+    const [roleOptions, setRoleOptions] = useState<string[]>([])
+    const [sessionUsername, setSessionUsername] = useState('')
+    const [sessionRol, setSessionRol] = useState('')
+    const [sessionEstado, setSessionEstado] = useState(true)
+    const [sessionPassword, setSessionPassword] = useState('')
 
     useEffect(() => {
         UserService.getAll().then((data) => {
             setUsers(data)
-            if (data.length > 0) setForm({ ...data[0] })
+            if (data.length > 0) {
+                setForm({ ...data[0] })
+                setSessionUsername(data[0].username || '')
+                setSessionRol(data[0].role || '')
+                setSessionEstado(data[0].estado === 'Activo')
+            }
             setLoading(false)
         })
+        RoleService.getAll().then((roles) => setRoleOptions(roles.map((r) => r.name)))
     }, [])
 
     const goTo = (index: number) => {
         setCurrentIndex(index)
         setForm({ ...users[index] })
+        setSessionUsername(users[index].username || '')
+        setSessionRol(users[index].role || '')
+        setSessionEstado(users[index].estado === 'Activo')
+        setSessionPassword('')
         setSubmitted(false)
     }
 
@@ -233,13 +255,113 @@ const AdminUsersPage = () => {
                             <div className="col-12">
                                 <Divider />
                                 <div className="flex justify-content-end">
-                                    <Button label="Guardar Cambios" icon="pi pi-check" loading={saving} onClick={handleSave} />
+                                    <Button label="Guardar Datos" icon="pi pi-check" loading={saving} onClick={handleSave} />
                                 </div>
                             </div>
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* Sección Sesión */}
+            {!loading && form && form.username && (
+                <div className="col-12">
+                    <div className="card">
+                        <div className="flex align-items-center gap-2 mb-4">
+                            <i className="pi pi-lock text-primary" style={{ fontSize: '1.2rem' }} />
+                            <h5 className="m-0 text-900">Credenciales y Acceso</h5>
+                        </div>
+                        <Divider className="mt-0 mb-4" />
+                        <div className="formgrid grid">
+                            {/* Nombre de usuario */}
+                            <div className="field col-12 md:col-6">
+                                <label className="font-medium text-700 text-sm block mb-2">
+                                    <i className="pi pi-at mr-1" />Nombre de Usuario
+                                </label>
+                                <InputText
+                                    value={sessionUsername}
+                                    onChange={(e) => setSessionUsername(e.target.value)}
+                                    placeholder="Nuevo username"
+                                    className="w-full"
+                                />
+                            </div>
+
+                            {/* Rol */}
+                            <div className="field col-12 md:col-6">
+                                <label className="font-medium text-700 text-sm block mb-2">
+                                    <i className="pi pi-shield mr-1" />Rol
+                                </label>
+                                <Dropdown
+                                    value={sessionRol}
+                                    options={roleOptions.map((r) => ({ label: r, value: r }))}
+                                    onChange={(e) => setSessionRol(e.value)}
+                                    placeholder="Seleccionar rol"
+                                    className="w-full"
+                                />
+                            </div>
+
+                            {/* Estado */}
+                            <div className="field col-12 md:col-6 flex flex-column justify-content-center">
+                                <label className="font-medium text-700 text-sm block mb-2">
+                                    <i className="pi pi-circle mr-1" />Estado de la cuenta
+                                </label>
+                                <div className="flex align-items-center gap-3">
+                                    <InputSwitch checked={sessionEstado} onChange={(e) => setSessionEstado(e.value)} />
+                                    <span className={sessionEstado ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
+                                        {sessionEstado ? 'Activa' : 'Inactiva'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Nueva contraseña */}
+                            <div className="field col-12">
+                                <label className="font-medium text-700 text-sm block mb-2">
+                                    <i className="pi pi-key mr-1" />Nueva Contraseña <span className="text-500 font-normal">(dejar vacío para no cambiar)</span>
+                                </label>
+                                <Password
+                                    value={sessionPassword}
+                                    onChange={(e) => setSessionPassword(e.target.value)}
+                                    placeholder="Nueva contraseña"
+                                    className="w-full"
+                                    inputClassName="w-full"
+                                    feedback={false}
+                                    toggleMask
+                                />
+                            </div>
+
+                            <div className="col-12">
+                                <Divider />
+                                <div className="flex justify-content-end">
+                                    <Button
+                                        label="Guardar Credenciales"
+                                        icon="pi pi-lock"
+                                        severity="warning"
+                                        loading={savingSession}
+                                        onClick={async () => {
+                                            if (!form.username) return
+                                            setSavingSession(true)
+                                            const result = await UserService.updateSession({
+                                                nombreUsuarioAModificar: form.username,
+                                                nuevoNombreUsuario: sessionUsername || null,
+                                                nuevoRol: sessionRol || null,
+                                                nuevoEstado: sessionEstado,
+                                                nuevaPasswordHash: sessionPassword || null
+                                            })
+                                            setSavingSession(false)
+                                            if (result.success) {
+                                                toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Credenciales actualizadas correctamente', life: 3000 })
+                                                setSessionPassword('')
+                                            } else {
+                                                toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error ?? 'No se pudo actualizar', life: 4000 })
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

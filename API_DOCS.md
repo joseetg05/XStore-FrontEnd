@@ -122,6 +122,34 @@ Verifica credenciales de un usuario (login). Retorna un token JWT.
 
 ---
 
+#### `PUT /api/sesiones` 🔒
+
+Modifica username, password, rol o estado de una sesión existente.
+
+**Body:**
+
+```json
+{
+  "nombreUsuario": "admin",
+  "nombreUsuarioAModificar": "jperez",
+  "nuevoNombreUsuario": "juanperez",
+  "nuevaPasswordHash": "nuevohash",
+  "nuevoRol": "Administrador",
+  "nuevoEstado": true
+}
+```
+
+| Campo                     | Tipo    | Requerido | Descripción                                       |
+| ------------------------- | ------- | --------- | ------------------------------------------------- |
+| `nombreUsuario`           | string  | Sí        | Usuario que ejecuta la acción                     |
+| `nombreUsuarioAModificar` | string  | Sí        | Username del usuario a modificar                  |
+| `nuevoNombreUsuario`      | string  | No        | Nuevo username (`null` = no modificar)            |
+| `nuevaPasswordHash`       | string  | No        | Nueva contraseña hasheada (`null` = no modificar) |
+| `nuevoRol`                | string  | No        | Nuevo rol (`null` = no modificar)                 |
+| `nuevoEstado`             | boolean | No        | Estado activo/inactivo (`null` = no modificar)    |
+
+---
+
 #### `POST /api/sesiones` 🔒
 
 Registra credenciales de login a una persona ya existente en el sistema.
@@ -210,7 +238,7 @@ Modifica un rol existente.
 
 #### `GET /api/tipos-productos?nombreUsuario={nombreUsuario}` — público
 
-Lista todos los tipos de producto.
+Lista todos los tipos de producto. `nombreUsuario` es **opcional**.
 
 ---
 
@@ -249,7 +277,7 @@ Lista todos los tipos de producto.
 
 #### `GET /api/marcas-productos?nombreUsuario={nombreUsuario}` — público
 
-Lista todas las marcas de producto.
+Lista todas las marcas de producto. `nombreUsuario` es **opcional**.
 
 ---
 
@@ -424,7 +452,7 @@ Registra un nuevo usuario del sistema. Internamente crea la persona y luego sus 
 
 #### `PUT /api/personas` 🔒
 
-Modifica datos de una persona existente.
+Modifica datos de una persona existente. `nombreUsuario` es **opcional** — si se omite, la persona se auto-modifica sin requerir rol de administrador.
 
 **Body:**
 
@@ -607,13 +635,13 @@ Lista todos los estados de entrega.
 
 ### Descuentos
 
-#### `GET /api/descuentos?nombreUsuario={u}&categoriaFiltro={c}&fechaDesde={d}&fechaHasta={h}` 🔒
+#### `GET /api/descuentos?nombreUsuario={u}&categoriaFiltro={c}&fechaDesde={d}&fechaHasta={h}` — público
 
 Consulta descuentos con filtros opcionales.
 
 | Param             | Tipo   | Requerido | Descripción                            |
 | ----------------- | ------ | --------- | -------------------------------------- |
-| `nombreUsuario`   | string | Sí        | Usuario que consulta                   |
+| `nombreUsuario`   | string | No        | Usuario que consulta                   |
 | `categoriaFiltro` | string | No        | Nombre exacto de la categoría          |
 | `fechaDesde`      | date   | No        | Rango de inicio (formato `YYYY-MM-DD`) |
 | `fechaHasta`      | date   | No        | Rango de fin (formato `YYYY-MM-DD`)    |
@@ -679,18 +707,60 @@ Modifica un descuento existente.
 
 ### Productos
 
-#### `GET /api/productos?nombreUsuario={u}&filtroDescripcion={d}&filtroTipo={t}&filtroMarca={m}&filtroProveedor={p}&filtroDescuento={dc}` 🔒
+#### `GET /api/productos?nombreUsuario={u}&filtroDescripcion={d}&filtroTipo={t}&filtroMarca={m}&filtroProveedor={p}&filtroDescuento={dc}` — público
 
 Consulta productos con filtros opcionales.
 
 | Param               | Tipo   | Requerido | Descripción                          |
 | ------------------- | ------ | --------- | ------------------------------------ |
-| `nombreUsuario`     | string | Sí        | Usuario que consulta                 |
+| `nombreUsuario`     | string | No        | Usuario que consulta                 |
 | `filtroDescripcion` | string | No        | Búsqueda parcial en descripción      |
 | `filtroTipo`        | string | No        | Nombre exacto del tipo de producto   |
 | `filtroMarca`       | string | No        | Nombre exacto de la marca            |
 | `filtroProveedor`   | string | No        | Nombre exacto del proveedor          |
 | `filtroDescuento`   | string | No        | Nombre exacto del descuento aplicado |
+
+---
+
+#### `PUT /api/productos` 🔒
+
+Modifica datos de un producto existente y/o ajusta su stock.
+
+**Body:**
+
+```json
+{
+  "nombreUsuario": "admin",
+  "descripcion": "Laptop HP 15 pulgadas",
+  "nuevaDescripcion": "Laptop HP 15\" FHD",
+  "nuevaRutaImagen": null,
+  "nuevoTipoProducto": null,
+  "nuevaMarcaProducto": null,
+  "nuevoNombreProveedor": null,
+  "nuevoPrecioCompra": null,
+  "nuevoPrecioVenta": 479000.0,
+  "nuevoNombreDescuento": null,
+  "nuevoEstado": null,
+  "ajusteStock": -2,
+  "nombreUbicacion": "Bodega A"
+}
+```
+
+| Campo                  | Tipo    | Requerido | Descripción                                                                    |
+| ---------------------- | ------- | --------- | ------------------------------------------------------------------------------ |
+| `nombreUsuario`        | string  | Sí        | Usuario que ejecuta la acción                                                  |
+| `descripcion`          | string  | Sí        | Descripción actual del producto (identificador)                                |
+| `nuevaDescripcion`     | string  | No        | Nueva descripción (`null` = no modificar)                                      |
+| `nuevaRutaImagen`      | string  | No        | Nueva ruta de imagen                                                           |
+| `nuevoTipoProducto`    | string  | No        | Nuevo tipo de producto                                                         |
+| `nuevaMarcaProducto`   | string  | No        | Nueva marca                                                                    |
+| `nuevoNombreProveedor` | string  | No        | Nuevo proveedor                                                                |
+| `nuevoPrecioCompra`    | decimal | No        | Nuevo precio de compra                                                         |
+| `nuevoPrecioVenta`     | decimal | No        | Nuevo precio de venta                                                          |
+| `nuevoNombreDescuento` | string  | No        | Nuevo descuento (`null` = no modificar, `""` = quitar descuento)               |
+| `nuevoEstado`          | boolean | No        | Estado activo/inactivo                                                         |
+| `ajusteStock`          | int     | No        | Ajuste de stock (positivo = ingreso, negativo = salida, `0` = ninguno)         |
+| `nombreUbicacion`      | string  | No        | Ubicación del ajuste de stock (requerido si `ajusteStock != 0`)                |
 
 ---
 
@@ -731,6 +801,35 @@ Registra un nuevo producto e ingresa stock al inventario.
 | `cantidadIngreso` | int     | Sí        | Cantidad a ingresar al inventario                                    |
 | `stockMinimo`     | int     | Sí        | Stock mínimo (solo aplica si es la primera vez en esa ubicación)     |
 | `nombreDescuento` | string  | No        | Nombre del descuento a aplicar (`null` = sin descuento)              |
+
+---
+
+### Inventario
+
+#### `GET /api/inventario?nombreUsuario={u}&filtroUbicacion={ub}&filtroProducto={p}` 🔒
+
+Consulta el stock de productos por ubicación con filtros opcionales.
+
+| Param             | Tipo   | Requerido | Descripción                                      |
+| ----------------- | ------ | --------- | ------------------------------------------------ |
+| `nombreUsuario`   | string | Sí        | Usuario que consulta                             |
+| `filtroUbicacion` | string | No        | Nombre exacto de la ubicación                    |
+| `filtroProducto`  | string | No        | Búsqueda parcial en descripción del producto     |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "Ubicación": "A01-01",
+    "Producto": "Laptop HP 15 pulgadas",
+    "Stock Actual": 8,
+    "Stock Mínimo": 2,
+    "Alerta": "OK",
+    "Estado": "Activo"
+  }
+]
+```
 
 ---
 
@@ -776,20 +875,21 @@ Registra una entrada de auditoría. **El frontend debe llamar este endpoint desp
 | `antes`         | string | No        | JSON stringify del estado anterior (requerido para UPDATE y DELETE) |
 | `despues`       | string | No        | JSON stringify del estado nuevo (requerido para INSERT y UPDATE)    |
 
-//1. Health — GET /api/health  
- //2. Sesiones — POST /verificar (login) + POST /api/sesiones (crear cuenta)  
- //3. Roles — GET + POST + PUT /api/roles  
- //4. Tipos de Producto — GET + POST + PUT /api/tipos-productos  
- //5. Marcas de Producto — GET + POST + PUT /api/marcas-productos  
- //6. Ubicaciones — GET + POST + PUT /api/ubicaciones  
- //7. Tipos de Persona — GET + POST + PUT /api/tipos-personas  
- //8. Personas — GET /api/personas + PUT /api/personas  
- //9. Usuarios — POST /api/usuarios (registro)
-//10. Proveedores — GET /api/proveedores + GET /nombres + POST + PUT  
- //11. Categorías Descuento — GET + POST + PUT /api/cat-descuentos  
- //12. Estados de Entrega — GET + POST + PUT /api/estados-entregas  
- //13. Descuentos — GET + POST + PUT /api/descuentos ← NUEVO  
- //14. Productos — GET + POST /api/productos ← NUEVO  
- 15. Auditorías — GET + POST /api/auditorias
+// 1.  Health       — GET /api/health
+// 2.  Sesiones     — PUT + POST /verificar (login) + POST /api/sesiones
+// 3.  Roles        — GET + POST + PUT /api/roles
+// 4.  Tipos Prod.  — GET (público) + POST + PUT /api/tipos-productos
+// 5.  Marcas       — GET (público) + POST + PUT /api/marcas-productos
+// 6.  Ubicaciones  — GET + POST + PUT /api/ubicaciones
+// 7.  Tipos Persona— GET + POST + PUT /api/tipos-personas
+// 8.  Personas     — GET + PUT /api/personas
+// 9.  Usuarios     — POST /api/usuarios (registro)
+// 10. Proveedores  — GET + GET /nombres + POST + PUT /api/proveedores
+// 11. Cat. Desc.   — GET + POST + PUT /api/cat-descuentos
+// 12. Est. Entrega — GET + POST + PUT /api/estados-entregas
+// 13. Descuentos   — GET (público) + POST + PUT /api/descuentos
+// 14. Productos    — GET (público) + POST + PUT /api/productos
+// 15. Inventario   — GET /api/inventario
+// 16. Auditorías   — GET + POST /api/auditorias
 
-//Revisar Edicion de productos, proceder con el pago
+// TODO: proceder con el pago

@@ -17,6 +17,7 @@ export interface CartTotals {
 
 interface CartContextValue {
     cartItems: CartItem[];
+    discounts: Discount[];
     addToCart: (product: Product) => void;
     removeFromCart: (productId: number) => void;
     updateQuantity: (productId: number, quantity: number) => void;
@@ -123,7 +124,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }, [cartItems, discounts]);
 
     return (
-        <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, updateQuantity, clearCart, getTotals }}>
+        <CartContext.Provider value={{ cartItems, discounts, addToCart, removeFromCart, updateQuantity, clearCart, getTotals }}>
             {children}
         </CartContext.Provider>
     );
