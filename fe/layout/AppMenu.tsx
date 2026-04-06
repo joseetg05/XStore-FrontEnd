@@ -47,7 +47,8 @@ const AppMenu = () => {
                 { label: 'Tipos de Descuento', icon: 'pi pi-fw pi-percentage', to: '/admin/discount-types' },
                 { label: 'Descuentos', icon: 'pi pi-fw pi-ticket', to: '/admin/discounts' },
                 { label: 'Proveedores', icon: 'pi pi-fw pi-truck', to: '/admin/suppliers' },
-                { label: 'Roles', icon: 'pi pi-fw pi-users', to: '/admin/roles' }
+                { label: 'Roles', icon: 'pi pi-fw pi-users', to: '/admin/roles' },
+                { label: 'Auditorías', icon: 'pi pi-fw pi-history', to: '/admin/auditorias' }
             ]
         },
         {
