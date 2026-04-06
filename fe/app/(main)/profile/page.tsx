@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Button } from 'primereact/button'
 import { Divider } from 'primereact/divider'
 import { InputText } from 'primereact/inputtext'
+import { Password } from 'primereact/password'
 import { Toast } from 'primereact/toast'
 import { classNames } from 'primereact/utils'
 
@@ -17,15 +18,20 @@ const ProfilePage = () => {
     const [form, setForm] = useState<PersonaUser>(emptyForm)
     const [submitted, setSubmitted] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [savingSession, setSavingSession] = useState(false)
+    const [sessionUsername, setSessionUsername] = useState('')
+    const [sessionPassword, setSessionPassword] = useState('')
 
     useEffect(() => {
         UserService.getOwn().then((data) => {
             if (data) {
                 setForm(data)
+                setSessionUsername(data.username)
             } else {
                 const session = AuthService.getCurrentUser()
                 if (session) {
                     setForm({ ...emptyForm, username: session.username, fullName: session.fullName, identification: session.identification, phone: session.phone, email: session.email, address: session.address })
+                    setSessionUsername(session.username)
                 }
             }
         })
@@ -159,6 +165,68 @@ const ProfilePage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Credenciales */}
+            {form.username && (
+                <div className="col-12">
+                    <div className="card">
+                        <div className="flex align-items-center gap-2 mb-4">
+                            <i className="pi pi-lock text-primary" style={{ fontSize: '1.2rem' }} />
+                            <h5 className="m-0 text-900">Credenciales de Acceso</h5>
+                        </div>
+                        <Divider className="mt-0 mb-4" />
+                        <div className="formgrid grid">
+                            <div className="field col-12 md:col-6">
+                                <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-at mr-1" />Nombre de Usuario</label>
+                                <InputText
+                                    value={sessionUsername}
+                                    onChange={(e) => setSessionUsername(e.target.value)}
+                                    placeholder="Nuevo username"
+                                    className="w-full"
+                                />
+                            </div>
+                            <div className="field col-12 md:col-6">
+                                <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-key mr-1" />Nueva Contraseña <span className="text-500 font-normal">(dejar vacío para no cambiar)</span></label>
+                                <Password
+                                    value={sessionPassword}
+                                    onChange={(e) => setSessionPassword(e.target.value)}
+                                    placeholder="Nueva contraseña"
+                                    className="w-full"
+                                    inputClassName="w-full"
+                                    feedback={false}
+                                    toggleMask
+                                />
+                            </div>
+                            <div className="col-12">
+                                <Divider />
+                                <div className="flex justify-content-end">
+                                    <Button
+                                        label="Guardar Credenciales"
+                                        icon="pi pi-lock"
+                                        severity="warning"
+                                        loading={savingSession}
+                                        onClick={async () => {
+                                            setSavingSession(true)
+                                            const result = await UserService.updateSession({
+                                                nombreUsuarioAModificar: form.username,
+                                                nuevoNombreUsuario: sessionUsername || null,
+                                                nuevaPasswordHash: sessionPassword || null
+                                            })
+                                            setSavingSession(false)
+                                            if (result.success) {
+                                                toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Credenciales actualizadas correctamente', life: 3000 })
+                                                setSessionPassword('')
+                                            } else {
+                                                toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error ?? 'No se pudo actualizar', life: 4000 })
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

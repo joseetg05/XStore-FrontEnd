@@ -267,13 +267,12 @@ const FilterSidebar = ({ visible, onHide, productTypes, brands, selectedType, se
 // ─── Shop Page ────────────────────────────────────────────────────────────────
 
 const ShopPage = () => {
-    const { addToCart, getTotals } = useCart();
+    const { addToCart, getTotals, discounts } = useCart();
     const { totalItems } = getTotals();
 
     const [products, setProducts] = useState<Product[]>([]);
     const [productTypes, setProductTypes] = useState<ProductType[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
-    const [discounts, setDiscounts] = useState<Discount[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [filterVisible, setFilterVisible] = useState(false);
@@ -294,10 +293,9 @@ const ShopPage = () => {
     ];
 
     useEffect(() => {
-        Promise.all([ProductService.getProductTypes(), ProductService.getBrands(), ProductService.getDiscounts()]).then(([types, brands, discounts]) => {
+        Promise.all([ProductService.getProductTypes(), ProductService.getBrands()]).then(([types, brands]) => {
             setProductTypes(types);
             setBrands(brands);
-            setDiscounts(discounts);
         });
     }, []);
 

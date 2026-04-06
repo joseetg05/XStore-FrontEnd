@@ -5,338 +5,330 @@ import { Button } from 'primereact/button'
 import { Column } from 'primereact/column'
 import { DataTable } from 'primereact/datatable'
 import { Dialog } from 'primereact/dialog'
-import { Dropdown } from 'primereact/dropdown'
 import { InputNumber } from 'primereact/inputnumber'
-import { InputSwitch } from 'primereact/inputswitch'
 import { InputText } from 'primereact/inputtext'
 import { Tag } from 'primereact/tag'
 import { Toast } from 'primereact/toast'
-import { Toolbar } from 'primereact/toolbar'
-import { classNames } from 'primereact/utils'
 
-import { Inventory } from '@/types/inventory'
-import { InventoryService } from '@/service/InventoryService'
-import { Product, ProductService } from '@/service/ProductService'
-import { InventoryLocation, InventoryLocationService } from '@/service/InventoryLocationService'
+import { InventoryEntry, InventoryService } from '@/service/InventoryService'
+import { ProductService } from '@/service/ProductService'
 
-const emptyInventory: Omit<Inventory, 'id'> = {
-    productId: 0,
-    locationId: 0,
-    minStock: 0,
-    currentStock: 0,
-    status: true
-}
+type AdjustMode = 'ingreso' | 'salida'
 
 const AdminInventoryPage = () => {
-    const [items, setItems] = useState<Inventory[]>([])
-    const [activeProducts, setActiveProducts] = useState<Product[]>([])
-    const [activeLocations, setActiveLocations] = useState<InventoryLocation[]>([])
-    const [productMap, setProductMap] = useState<Map<number, string>>(new Map())
-    const [locationMap, setLocationMap] = useState<Map<number, string>>(new Map())
-
-    const [inventoryDialog, setInventoryDialog] = useState(false)
-    const [deleteDialog, setDeleteDialog] = useState(false)
-    const [item, setItem] = useState<Partial<Inventory>>(emptyInventory)
-    const [submitted, setSubmitted] = useState(false)
-    const [globalFilter, setGlobalFilter] = useState('')
     const toast = useRef<Toast>(null)
-    const dt = useRef<DataTable<Inventory[]>>(null)
+    const [items, setItems] = useState<InventoryEntry[]>([])
+    const [loading, setLoading] = useState(false)
 
-    useEffect(() => {
-        loadData()
-    }, [])
+    const [filtroUbicacion, setFiltroUbicacion] = useState('')
+    const [filtroProducto, setFiltroProducto] = useState('')
 
-    const loadData = () => {
-        Promise.all([
-            InventoryService.getAll(),
-            ProductService.getAllProducts(),
-            InventoryLocationService.getAll()
-        ]).then(([inventoryData, productsData, locationsData]) => {
-            setItems(inventoryData)
+    const [adjustDialog, setAdjustDialog] = useState(false)
+    const [selectedEntry, setSelectedEntry] = useState<InventoryEntry | null>(null)
+    const [mode, setMode] = useState<AdjustMode>('ingreso')
+    const [cantidad, setCantidad] = useState<number>(1)
+    const [saving, setSaving] = useState(false)
 
-            const activeProds = productsData.filter((p) => p.status)
-            setActiveProducts(activeProds)
-
-            const pMap = new Map<number, string>()
-            productsData.forEach((p) => pMap.set(p.id, p.description))
-            setProductMap(pMap)
-
-            const activeLocs = locationsData.filter((l) => l.status)
-            setActiveLocations(activeLocs)
-
-            const lMap = new Map<number, string>()
-            locationsData.forEach((l) => lMap.set(l.id, l.name))
-            setLocationMap(lMap)
+    const loadData = async (ubicacion = filtroUbicacion, producto = filtroProducto) => {
+        setLoading(true)
+        const data = await InventoryService.getAll({
+            filtroUbicacion: ubicacion || undefined,
+            filtroProducto: producto || undefined
         })
+        setItems(data)
+        setLoading(false)
     }
 
-    // ─── CRUD Actions ──────────────────────────────────────────────────────────
+    useEffect(() => { loadData() }, [])
 
-    const openNew = () => {
-        setItem(emptyInventory)
-        setSubmitted(false)
-        setInventoryDialog(true)
+    const handleSearch = () => loadData()
+    const handleClear = () => {
+        setFiltroUbicacion('')
+        setFiltroProducto('')
+        loadData('', '')
     }
 
-    const hideDialog = () => {
-        setSubmitted(false)
-        setInventoryDialog(false)
+    // ─── Estadísticas rápidas ───────────────────────────────────────────────────
+
+    const lowStockCount = items.filter((i) => i.stock <= i.minStock).length
+    const totalStock = items.reduce((acc, i) => acc + i.stock, 0)
+
+    // ─── Ajuste ─────────────────────────────────────────────────────────────────
+
+    const openAdjust = (entry: InventoryEntry) => {
+        setSelectedEntry(entry)
+        setMode('ingreso')
+        setCantidad(1)
+        setAdjustDialog(true)
     }
 
-    const hideDeleteDialog = () => {
-        setDeleteDialog(false)
+    const hideAdjustDialog = () => {
+        setAdjustDialog(false)
+        setSelectedEntry(null)
     }
 
-    const saveItem = async () => {
-        setSubmitted(true)
+    const saveAdjust = async () => {
+        if (!selectedEntry || cantidad <= 0) return
+        setSaving(true)
+        const ajuste = mode === 'ingreso' ? cantidad : -cantidad
+        const result = await ProductService.adjustStock(selectedEntry.description, ajuste, selectedEntry.location)
+        setSaving(false)
 
-        if (!item.productId || !item.locationId) return
-        if ((item.minStock ?? 0) < 0 || (item.currentStock ?? 0) < 0) return
-
-        let result
-        if (item.id) {
-            result = await InventoryService.update(item as Inventory)
-            if (result.success) {
-                toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Registro actualizado correctamente', life: 3000 })
-            } else {
-                toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error, life: 3000 })
-                return
-            }
-        } else {
-            result = await InventoryService.create(item as Omit<Inventory, 'id'>)
-            if (result.success) {
-                toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Registro creado correctamente', life: 3000 })
-            } else {
-                toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error, life: 3000 })
-                return
-            }
-        }
-
-        setInventoryDialog(false)
-        setItem(emptyInventory)
-        loadData()
-    }
-
-    const editItem = (inv: Inventory) => {
-        setItem({ ...inv })
-        setSubmitted(false)
-        setInventoryDialog(true)
-    }
-
-    const confirmDelete = (inv: Inventory) => {
-        setItem({ ...inv })
-        setDeleteDialog(true)
-    }
-
-    const deleteItem = async () => {
-        if (!item.id) return
-        const res = await InventoryService.delete(item.id)
-        if (res.success) {
-            toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Registro eliminado correctamente', life: 3000 })
+        if (result.success) {
+            toast.current?.show({ severity: 'success', summary: 'Éxito', detail: `Stock ${mode === 'ingreso' ? 'ingresado' : 'descontado'} correctamente`, life: 3000 })
+            setAdjustDialog(false)
             loadData()
         } else {
-            toast.current?.show({ severity: 'error', summary: 'Error', detail: res.error, life: 3000 })
-        }
-        setDeleteDialog(false)
-        setItem(emptyInventory)
-    }
-
-    const toggleStatus = async (inv: Inventory) => {
-        const res = await InventoryService.toggleStatus(inv.id)
-        if (res.success) {
-            const productName = productMap.get(inv.productId) ?? `ID: ${inv.productId}`
-            toast.current?.show({ severity: 'info', summary: 'Estado actualizado', detail: `"${productName}" ahora está ${res.inventory?.status ? 'activo' : 'inactivo'}`, life: 2500 })
-            loadData()
-        } else {
-            toast.current?.show({ severity: 'error', summary: 'Error', detail: res.error, life: 3000 })
+            toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error, life: 3000 })
         }
     }
 
-    // ─── Column Templates ──────────────────────────────────────────────────────
+    // ─── Column templates ───────────────────────────────────────────────────────
 
-    const productBodyTemplate = (rowData: Inventory) =>
-        productMap.get(rowData.productId) ?? `(ID: ${rowData.productId})`
-
-    const locationBodyTemplate = (rowData: Inventory) =>
-        locationMap.get(rowData.locationId) ?? `(ID: ${rowData.locationId})`
-
-    const stockAlertBodyTemplate = (rowData: Inventory) => {
-        const isLow = rowData.currentStock <= rowData.minStock
-        return <Tag severity={isLow ? 'danger' : 'success'} value={isLow ? 'Stock bajo' : 'OK'} />
-    }
-
-    const statusBodyTemplate = (rowData: Inventory) => (
-        <InputSwitch checked={rowData.status} onChange={() => toggleStatus(rowData)} />
-    )
-
-    const actionBodyTemplate = (rowData: Inventory) => (
-        <>
-            <Button icon="pi pi-pencil" rounded severity="success" className="mr-2" onClick={() => editItem(rowData)} />
-            <Button icon="pi pi-trash" rounded severity="warning" onClick={() => confirmDelete(rowData)} />
-        </>
-    )
-
-    const leftToolbarTemplate = () => (
-        <div className="my-2">
-            <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />
-        </div>
-    )
-
-    const header = (
-        <div className="flex flex-column md:flex-row md:justify-content-between md:align-items-center">
-            <h5 className="m-0">Gestión de Inventario</h5>
-            <span className="block mt-2 md:mt-0 p-input-icon-left">
-                <i className="pi pi-search" />
-                <InputText type="search" onInput={(e) => setGlobalFilter(e.currentTarget.value)} placeholder="Buscar..." />
+    const stockBodyTemplate = (row: InventoryEntry) => {
+        const isLow = row.stock <= row.minStock
+        return (
+            <span className={`font-bold ${isLow ? 'text-red-500' : 'text-green-600'}`}>
+                {row.stock}
             </span>
-        </div>
+        )
+    }
+
+    const alertBodyTemplate = (row: InventoryEntry) => {
+        const isLow = row.stock <= row.minStock
+        return <Tag severity={isLow ? 'danger' : 'success'} icon={isLow ? 'pi pi-exclamation-triangle' : 'pi pi-check'} value={isLow ? 'Stock bajo' : 'OK'} />
+    }
+
+    const statusBodyTemplate = (row: InventoryEntry) => (
+        <Tag severity={row.status ? 'success' : 'secondary'} value={row.status ? 'Activo' : 'Inactivo'} />
     )
 
-    const dialogFooter = (
-        <>
-            <Button label="Cancelar" icon="pi pi-times" text onClick={hideDialog} />
-            <Button label="Guardar" icon="pi pi-check" text onClick={saveItem} />
-        </>
+    const actionBodyTemplate = (row: InventoryEntry) => (
+        <Button
+            label="Ajustar"
+            icon="pi pi-arrow-right-arrow-left"
+            size="small"
+            severity="info"
+            outlined
+            onClick={() => openAdjust(row)}
+        />
     )
 
-    const deleteDialogFooter = (
-        <>
-            <Button label="No" icon="pi pi-times" text onClick={hideDeleteDialog} />
-            <Button label="Sí" icon="pi pi-check" text onClick={deleteItem} />
-        </>
-    )
+    const stockResultado = selectedEntry
+        ? mode === 'ingreso'
+            ? selectedEntry.stock + cantidad
+            : selectedEntry.stock - cantidad
+        : 0
 
-    const productName = item.productId ? (productMap.get(item.productId) ?? `ID: ${item.productId}`) : ''
-
-    // ─── Render ────────────────────────────────────────────────────────────────
+    // ─── Render ─────────────────────────────────────────────────────────────────
 
     return (
-        <div className="grid crud-demo">
-            <div className="col-12">
-                <div className="card">
-                    <Toast ref={toast} />
-                    <Toolbar className="mb-4" left={leftToolbarTemplate} />
+        <div className="grid">
+            <Toast ref={toast} />
 
-                    <DataTable
-                        ref={dt}
-                        value={items}
-                        dataKey="id"
-                        paginator
-                        rows={10}
-                        rowsPerPageOptions={[5, 10, 25]}
-                        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-                        currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} registros"
-                        globalFilter={globalFilter}
-                        emptyMessage="No se encontraron registros de inventario."
-                        header={header}
-                        responsiveLayout="scroll"
-                    >
-                        <Column field="id" header="ID" sortable headerStyle={{ minWidth: '5rem' }} />
-                        <Column header="Producto" body={productBodyTemplate} sortable sortField="productId" headerStyle={{ minWidth: '14rem' }} />
-                        <Column header="Ubicación" body={locationBodyTemplate} sortable sortField="locationId" headerStyle={{ minWidth: '12rem' }} />
-                        <Column field="currentStock" header="Stock Actual" sortable headerStyle={{ minWidth: '10rem' }} />
-                        <Column field="minStock" header="Stock Mínimo" sortable headerStyle={{ minWidth: '10rem' }} />
-                        <Column header="Alerta" body={stockAlertBodyTemplate} headerStyle={{ minWidth: '9rem' }} />
-                        <Column field="status" header="Activo" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '8rem' }} />
-                        <Column body={actionBodyTemplate} headerStyle={{ minWidth: '10rem' }} />
-                    </DataTable>
-
-                    {/* CREATE / EDIT DIALOG */}
-                    <Dialog
-                        visible={inventoryDialog}
-                        style={{ width: '500px' }}
-                        header={item.id ? 'Editar Registro de Inventario' : 'Nuevo Registro de Inventario'}
-                        modal
-                        className="p-fluid"
-                        footer={dialogFooter}
-                        onHide={hideDialog}
-                    >
-                        <div className="field">
-                            <label htmlFor="productId">Producto</label>
-                            <Dropdown
-                                id="productId"
-                                value={item.productId || null}
-                                options={activeProducts}
-                                onChange={(e) => setItem({ ...item, productId: e.value })}
-                                optionLabel="description"
-                                optionValue="id"
-                                placeholder="Seleccione un producto"
-                                className={classNames({ 'p-invalid': submitted && !item.productId })}
-                                filter
-                            />
-                            {submitted && !item.productId && <small className="p-error">El producto es obligatorio.</small>}
+            {/* Estadísticas */}
+            <div className="col-12 md:col-4">
+                <div className="card h-full" style={{ borderLeft: '4px solid var(--primary-color)' }}>
+                    <div className="flex align-items-center gap-3">
+                        <div className="flex align-items-center justify-content-center border-circle bg-primary" style={{ width: '48px', height: '48px', flexShrink: 0 }}>
+                            <i className="pi pi-box text-white" style={{ fontSize: '1.3rem' }} />
                         </div>
-
-                        <div className="field">
-                            <label htmlFor="locationId">Ubicación</label>
-                            <Dropdown
-                                id="locationId"
-                                value={item.locationId || null}
-                                options={activeLocations}
-                                onChange={(e) => setItem({ ...item, locationId: e.value })}
-                                optionLabel="name"
-                                optionValue="id"
-                                placeholder="Seleccione una ubicación"
-                                className={classNames({ 'p-invalid': submitted && !item.locationId })}
-                            />
-                            {submitted && !item.locationId && <small className="p-error">La ubicación es obligatoria.</small>}
+                        <div>
+                            <div className="text-500 text-sm font-medium">Total de productos</div>
+                            <div className="text-900 font-bold text-2xl">{items.length}</div>
                         </div>
-
-                        <div className="formgrid grid">
-                            <div className="field col">
-                                <label htmlFor="currentStock">Stock Actual</label>
-                                <InputNumber
-                                    id="currentStock"
-                                    value={item.currentStock ?? 0}
-                                    onValueChange={(e) => setItem({ ...item, currentStock: e.value ?? 0 })}
-                                    min={0}
-                                    showButtons
-                                    className={classNames({ 'p-invalid': submitted && (item.currentStock ?? 0) < 0 })}
-                                />
-                                {submitted && (item.currentStock ?? 0) < 0 && <small className="p-error">No puede ser negativo.</small>}
-                            </div>
-                            <div className="field col">
-                                <label htmlFor="minStock">Stock Mínimo</label>
-                                <InputNumber
-                                    id="minStock"
-                                    value={item.minStock ?? 0}
-                                    onValueChange={(e) => setItem({ ...item, minStock: e.value ?? 0 })}
-                                    min={0}
-                                    showButtons
-                                    className={classNames({ 'p-invalid': submitted && (item.minStock ?? 0) < 0 })}
-                                />
-                                {submitted && (item.minStock ?? 0) < 0 && <small className="p-error">No puede ser negativo.</small>}
-                            </div>
-                        </div>
-
-                        <div className="field flex align-items-center gap-3">
-                            <label htmlFor="status" className="mb-0">Activo</label>
-                            <InputSwitch
-                                id="status"
-                                checked={item.status ?? true}
-                                onChange={(e) => setItem({ ...item, status: e.value })}
-                            />
-                        </div>
-                    </Dialog>
-
-                    {/* DELETE CONFIRM DIALOG */}
-                    <Dialog
-                        visible={deleteDialog}
-                        style={{ width: '450px' }}
-                        header="Confirmar eliminación"
-                        modal
-                        footer={deleteDialogFooter}
-                        onHide={hideDeleteDialog}
-                    >
-                        <div className="flex align-items-center justify-content-center">
-                            <i className="pi pi-exclamation-triangle mr-3" style={{ fontSize: '2rem' }} />
-                            <span>
-                                ¿Estás seguro de que quieres eliminar el registro de <b>{productName}</b>?
-                            </span>
-                        </div>
-                    </Dialog>
+                    </div>
                 </div>
             </div>
+            <div className="col-12 md:col-4">
+                <div className="card h-full" style={{ borderLeft: '4px solid var(--green-500)' }}>
+                    <div className="flex align-items-center gap-3">
+                        <div className="flex align-items-center justify-content-center border-circle" style={{ width: '48px', height: '48px', flexShrink: 0, background: 'var(--green-500)' }}>
+                            <i className="pi pi-database text-white" style={{ fontSize: '1.3rem' }} />
+                        </div>
+                        <div>
+                            <div className="text-500 text-sm font-medium">Unidades en stock</div>
+                            <div className="text-900 font-bold text-2xl">{totalStock.toLocaleString('es-CR')}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div className="col-12 md:col-4">
+                <div className="card h-full" style={{ borderLeft: `4px solid ${lowStockCount > 0 ? 'var(--red-500)' : 'var(--green-500)'}` }}>
+                    <div className="flex align-items-center gap-3">
+                        <div className="flex align-items-center justify-content-center border-circle" style={{ width: '48px', height: '48px', flexShrink: 0, background: lowStockCount > 0 ? 'var(--red-500)' : 'var(--green-500)' }}>
+                            <i className={`pi ${lowStockCount > 0 ? 'pi-exclamation-triangle' : 'pi-check-circle'} text-white`} style={{ fontSize: '1.3rem' }} />
+                        </div>
+                        <div>
+                            <div className="text-500 text-sm font-medium">Alertas de stock bajo</div>
+                            <div className="font-bold text-2xl" style={{ color: lowStockCount > 0 ? 'var(--red-500)' : 'var(--green-500)' }}>{lowStockCount}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filtros */}
+            <div className="col-12">
+                <div className="card">
+                    <div className="flex align-items-center gap-2 mb-4">
+                        <i className="pi pi-filter text-primary" style={{ fontSize: '1.1rem' }} />
+                        <h5 className="m-0">Filtros</h5>
+                    </div>
+                    <div className="formgrid grid">
+                        <div className="field col-12 md:col-6">
+                            <label className="font-medium text-700 text-sm block mb-2">Ubicación</label>
+                            <InputText value={filtroUbicacion} onChange={(e) => setFiltroUbicacion(e.target.value)} placeholder="Nombre de ubicación" className="w-full"
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+                        </div>
+                        <div className="field col-12 md:col-6">
+                            <label className="font-medium text-700 text-sm block mb-2">Producto</label>
+                            <InputText value={filtroProducto} onChange={(e) => setFiltroProducto(e.target.value)} placeholder="Descripción del producto" className="w-full"
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+                        </div>
+                        <div className="col-12 flex justify-content-end gap-2 mt-2">
+                            <Button label="Limpiar" icon="pi pi-times" severity="secondary" outlined onClick={handleClear} />
+                            <Button label="Buscar" icon="pi pi-search" onClick={handleSearch} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Tabla */}
+            <div className="col-12">
+                <div className="card">
+                    <DataTable
+                        value={items}
+                        paginator
+                        rows={15}
+                        rowsPerPageOptions={[10, 15, 25, 50]}
+                        loading={loading}
+                        header={
+                            <div className="flex align-items-center justify-content-between">
+                                <h5 className="m-0">Registros de Inventario</h5>
+                                <span className="text-500 text-sm">{items.length} resultado{items.length !== 1 ? 's' : ''}</span>
+                            </div>
+                        }
+                        emptyMessage="No se encontraron registros de inventario."
+                        stripedRows
+                        className="p-datatable-sm"
+                    >
+                        <Column field="description" header="Producto" sortable style={{ minWidth: '220px' }} />
+                        <Column field="location" header="Ubicación" sortable style={{ minWidth: '130px' }} />
+                        <Column field="stock" header="Stock Actual" sortable body={stockBodyTemplate} style={{ minWidth: '120px' }} />
+                        <Column field="minStock" header="Stock Mínimo" sortable style={{ minWidth: '130px' }} />
+                        <Column header="Alerta" body={alertBodyTemplate} style={{ minWidth: '120px' }} />
+                        <Column header="Estado" body={statusBodyTemplate} style={{ minWidth: '100px' }} />
+                        <Column header="" body={actionBodyTemplate} style={{ minWidth: '110px' }} />
+                    </DataTable>
+                </div>
+            </div>
+
+            {/* Dialog ajuste de stock */}
+            <Dialog
+                visible={adjustDialog}
+                style={{ width: '460px' }}
+                header="Ajuste de Stock"
+                modal
+                onHide={hideAdjustDialog}
+                footer={
+                    <>
+                        <Button label="Cancelar" icon="pi pi-times" text onClick={hideAdjustDialog} />
+                        <Button
+                            label={mode === 'ingreso' ? 'Ingresar' : 'Descontar'}
+                            icon={mode === 'ingreso' ? 'pi pi-plus' : 'pi pi-minus'}
+                            severity={mode === 'ingreso' ? 'success' : 'danger'}
+                            loading={saving}
+                            onClick={saveAdjust}
+                            disabled={cantidad <= 0}
+                        />
+                    </>
+                }
+            >
+                {selectedEntry && (
+                    <div className="flex flex-column gap-4 pt-2">
+
+                        {/* Info del producto */}
+                        <div className="border-round p-3" style={{ background: 'var(--surface-50)' }}>
+                            <div className="font-bold text-900 mb-1">{selectedEntry.description}</div>
+                            <div className="flex gap-4 text-sm text-600">
+                                <span><i className="pi pi-map-marker mr-1" />{selectedEntry.location}</span>
+                                <span><i className="pi pi-box mr-1" />Stock actual: <strong className="text-900">{selectedEntry.stock}</strong></span>
+                                <span>Mínimo: <strong className="text-900">{selectedEntry.minStock}</strong></span>
+                            </div>
+                        </div>
+
+                        {/* Selector de modo */}
+                        <div>
+                            <label className="font-medium text-700 text-sm block mb-2">Tipo de movimiento</label>
+                            <div className="flex gap-2">
+                                <Button
+                                    label="Ingreso"
+                                    icon="pi pi-plus-circle"
+                                    className="flex-1"
+                                    severity="success"
+                                    outlined={mode !== 'ingreso'}
+                                    onClick={() => setMode('ingreso')}
+                                />
+                                <Button
+                                    label="Salida"
+                                    icon="pi pi-minus-circle"
+                                    className="flex-1"
+                                    severity="danger"
+                                    outlined={mode !== 'salida'}
+                                    onClick={() => setMode('salida')}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Cantidad */}
+                        <div className="field mb-0">
+                            <label className="font-medium text-700 text-sm block mb-2">Cantidad</label>
+                            <InputNumber
+                                value={cantidad}
+                                onValueChange={(e) => setCantidad(Math.max(1, e.value ?? 1))}
+                                min={1}
+                                showButtons
+                                buttonLayout="horizontal"
+                                decrementButtonClassName="p-button-secondary"
+                                incrementButtonClassName={mode === 'ingreso' ? 'p-button-success' : 'p-button-danger'}
+                                incrementButtonIcon="pi pi-plus"
+                                decrementButtonIcon="pi pi-minus"
+                                className="w-full"
+                                inputClassName="text-center font-bold text-xl"
+                            />
+                        </div>
+
+                        {/* Vista previa */}
+                        <div className="border-round p-3 flex align-items-center justify-content-between"
+                            style={{ background: mode === 'ingreso' ? 'var(--green-50)' : 'var(--red-50)', border: `1px solid ${mode === 'ingreso' ? 'var(--green-200)' : 'var(--red-200)'}` }}>
+                            <div className="text-center flex-1">
+                                <div className="text-500 text-xs mb-1">Actual</div>
+                                <div className="font-bold text-2xl text-900">{selectedEntry.stock}</div>
+                            </div>
+                            <i className={`pi ${mode === 'ingreso' ? 'pi-arrow-right text-green-500' : 'pi-arrow-right text-red-500'} text-xl mx-3`} />
+                            <div className="text-center flex-1">
+                                <div className="text-500 text-xs mb-1">Resultado</div>
+                                <div className={`font-bold text-2xl ${stockResultado < selectedEntry.minStock ? 'text-red-500' : mode === 'ingreso' ? 'text-green-600' : 'text-orange-500'}`}>
+                                    {stockResultado}
+                                </div>
+                            </div>
+                            <div className="text-center flex-1">
+                                <div className="text-500 text-xs mb-1">Movimiento</div>
+                                <div className={`font-bold text-lg ${mode === 'ingreso' ? 'text-green-600' : 'text-red-500'}`}>
+                                    {mode === 'ingreso' ? '+' : '-'}{cantidad}
+                                </div>
+                            </div>
+                        </div>
+
+                        {stockResultado < selectedEntry.minStock && (
+                            <div className="flex align-items-center gap-2 p-2 border-round" style={{ background: 'var(--yellow-50)', border: '1px solid var(--yellow-300)' }}>
+                                <i className="pi pi-exclamation-triangle text-yellow-600" />
+                                <span className="text-yellow-700 text-sm">El stock resultante quedará por debajo del mínimo establecido.</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Dialog>
         </div>
     )
 }

@@ -19,7 +19,9 @@ const fromApi = (t: ApiProductType, index: number): ProductType => ({
 export const ProductTypeService = {
     async getAll(): Promise<ProductType[]> {
         const u = getCurrentUsername()
-        const data = await apiCall<ApiProductType[]>('GET', `/api/tipos-productos?nombreUsuario=${u}`)
+        const params = new URLSearchParams()
+        if (u) params.append('nombreUsuario', u)
+        const data = await apiCall<ApiProductType[]>('GET', `/api/tipos-productos?${params}`)
         return (data ?? []).map((t, i) => fromApi(t, i))
     },
 

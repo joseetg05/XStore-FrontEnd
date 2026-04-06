@@ -13,7 +13,7 @@ import { Toast } from 'primereact/toast'
 import { Toolbar } from 'primereact/toolbar'
 import { classNames } from 'primereact/utils'
 
-import { CreateProductPayload, Product, ProductService, ProductType, Brand } from '../../../../service/ProductService'
+import { CreateProductPayload, UpdateProductPayload, Product, ProductService, ProductType, Brand } from '../../../../service/ProductService'
 import { DiscountService } from '../../../../service/DiscountService'
 import { InventoryLocationService } from '../../../../service/InventoryLocationService'
 import { SupplierService } from '../../../../service/SupplierService'
@@ -44,8 +44,15 @@ const formatCurrency = (value: number) =>
 const AdminProductsPage = () => {
     const [products, setProducts] = useState<Product[]>([])
     const [productDialog, setProductDialog] = useState(false)
+    const [editDialog, setEditDialog] = useState(false)
+    const [editForm, setEditForm] = useState<UpdateProductPayload & { salePrice: number; purchasePrice: number; status: boolean }>({
+        description: '', nuevaDescripcion: '', nuevaRutaImagen: '', nuevoTipoProducto: '', nuevaMarcaProducto: '',
+        nuevoNombreProveedor: '', nuevoPrecioCompra: 0, nuevoPrecioVenta: 0, nuevoNombreDescuento: '', nuevoEstado: true,
+        salePrice: 0, purchasePrice: 0, status: true
+    })
     const [form, setForm] = useState<CreateProductPayload>(emptyForm)
     const [submitted, setSubmitted] = useState(false)
+    const [editSubmitted, setEditSubmitted] = useState(false)
     const [globalFilter, setGlobalFilter] = useState('')
     const toast = useRef<Toast>(null)
     const dt = useRef<DataTable<Product[]>>(null)
@@ -130,6 +137,10 @@ const AdminProductsPage = () => {
         <InputSwitch checked={rowData.status} disabled />
     )
 
+    const actionBodyTemplate = (rowData: Product) => (
+        <Button icon="pi pi-pencil" rounded severity="info" onClick={() => openEdit(rowData)} tooltip="Editar" tooltipOptions={{ position: 'left' }} />
+    )
+
     const leftToolbarTemplate = () => (
         <div className="my-2">
             <Button label="Nuevo" icon="pi pi-plus" severity="success" onClick={openNew} />
@@ -153,7 +164,53 @@ const AdminProductsPage = () => {
         </>
     )
 
+    const openEdit = (product: Product) => {
+        setEditForm({
+            description: product.description,
+            nuevaDescripcion: product.description,
+            nuevaRutaImagen: product.imageUrl,
+            nuevoTipoProducto: product.type,
+            nuevaMarcaProducto: product.brand,
+            nuevoNombreProveedor: product.provider,
+            nuevoPrecioCompra: product.purchasePrice,
+            nuevoPrecioVenta: product.salePrice,
+            nuevoNombreDescuento: product.discountName || '',
+            nuevoEstado: product.status,
+            salePrice: product.salePrice,
+            purchasePrice: product.purchasePrice,
+            status: product.status
+        })
+        setEditSubmitted(false)
+        setEditDialog(true)
+    }
+
+    const saveEdit = async () => {
+        setEditSubmitted(true)
+        if (!editForm.nuevaDescripcion?.trim() || (editForm.nuevoPrecioVenta ?? 0) <= 0) return
+
+        const result = await ProductService.updateProduct({
+            description: editForm.description,
+            nuevaDescripcion: editForm.nuevaDescripcion !== editForm.description ? editForm.nuevaDescripcion : null,
+            nuevaRutaImagen: editForm.nuevaRutaImagen || null,
+            nuevoTipoProducto: editForm.nuevoTipoProducto || null,
+            nuevaMarcaProducto: editForm.nuevaMarcaProducto || null,
+            nuevoNombreProveedor: editForm.nuevoNombreProveedor || null,
+            nuevoPrecioCompra: editForm.nuevoPrecioCompra ?? null,
+            nuevoPrecioVenta: editForm.nuevoPrecioVenta ?? null,
+            nuevoNombreDescuento: editForm.nuevoNombreDescuento ?? null,
+            nuevoEstado: editForm.nuevoEstado ?? null
+        })
+        if (result.success) {
+            toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Producto actualizado correctamente', life: 3000 })
+            setEditDialog(false)
+            loadData()
+        } else {
+            toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error, life: 3000 })
+        }
+    }
+
     const req = (field: boolean) => submitted && !field
+    const reqEdit = (field: boolean) => editSubmitted && !field
 
     return (
         <div className="grid crud-demo">
@@ -184,6 +241,7 @@ const AdminProductsPage = () => {
                         <Column field="provider" header="Proveedor" sortable headerStyle={{ minWidth: '12rem' }} />
                         <Column field="salePrice" header="Precio Venta" body={priceBodyTemplate} sortable headerStyle={{ minWidth: '10rem' }} />
                         <Column field="status" header="Activo" body={statusBodyTemplate} sortable headerStyle={{ minWidth: '7rem' }} />
+                        <Column body={actionBodyTemplate} headerStyle={{ minWidth: '5rem' }} />
                     </DataTable>
 
                     {/* CREATE DIALOG */}
@@ -338,6 +396,125 @@ const AdminProductsPage = () => {
                                 optionLabel="label"
                                 optionValue="name"
                             />
+                        </div>
+                    </Dialog>
+                    {/* EDIT DIALOG */}
+                    <Dialog
+                        visible={editDialog}
+                        style={{ width: '620px' }}
+                        header="Editar Producto"
+                        modal
+                        className="p-fluid"
+                        footer={
+                            <>
+                                <Button label="Cancelar" icon="pi pi-times" text onClick={() => setEditDialog(false)} />
+                                <Button label="Guardar" icon="pi pi-check" text onClick={saveEdit} />
+                            </>
+                        }
+                        onHide={() => setEditDialog(false)}
+                    >
+                        {/* Descripción */}
+                        <div className="field">
+                            <label>Descripción *</label>
+                            <InputText
+                                value={editForm.nuevaDescripcion ?? ''}
+                                onChange={(e) => setEditForm({ ...editForm, nuevaDescripcion: e.target.value })}
+                                className={classNames({ 'p-invalid': reqEdit(!!(editForm.nuevaDescripcion ?? '').trim()) })}
+                            />
+                            {reqEdit(!!(editForm.nuevaDescripcion ?? '').trim()) && <small className="p-error">La descripción es obligatoria.</small>}
+                        </div>
+
+                        {/* URL Imagen */}
+                        <div className="field">
+                            <label>URL de la Imagen</label>
+                            <InputText
+                                value={editForm.nuevaRutaImagen ?? ''}
+                                onChange={(e) => setEditForm({ ...editForm, nuevaRutaImagen: e.target.value })}
+                                placeholder="https://..."
+                            />
+                        </div>
+
+                        {/* Tipo / Marca */}
+                        <div className="formgrid grid">
+                            <div className="field col">
+                                <label>Tipo de Producto</label>
+                                <Dropdown
+                                    value={editForm.nuevoTipoProducto || null}
+                                    options={types}
+                                    onChange={(e) => setEditForm({ ...editForm, nuevoTipoProducto: e.value })}
+                                    optionLabel="name"
+                                    optionValue="name"
+                                    placeholder="Seleccione uno"
+                                />
+                            </div>
+                            <div className="field col">
+                                <label>Marca</label>
+                                <Dropdown
+                                    value={editForm.nuevaMarcaProducto || null}
+                                    options={brands}
+                                    onChange={(e) => setEditForm({ ...editForm, nuevaMarcaProducto: e.value })}
+                                    optionLabel="name"
+                                    optionValue="name"
+                                    placeholder="Seleccione una"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Proveedor */}
+                        <div className="field">
+                            <label>Proveedor</label>
+                            <Dropdown
+                                value={editForm.nuevoNombreProveedor || null}
+                                options={providers.map((p) => ({ label: p, value: p }))}
+                                onChange={(e) => setEditForm({ ...editForm, nuevoNombreProveedor: e.value })}
+                                placeholder="Seleccione uno"
+                            />
+                        </div>
+
+                        {/* Precios */}
+                        <div className="formgrid grid">
+                            <div className="field col">
+                                <label>Precio de Compra</label>
+                                <InputNumber
+                                    value={editForm.nuevoPrecioCompra ?? 0}
+                                    onValueChange={(e) => setEditForm({ ...editForm, nuevoPrecioCompra: e.value ?? 0 })}
+                                    mode="currency" currency="CRC" locale="es-CR"
+                                />
+                            </div>
+                            <div className="field col">
+                                <label>Precio de Venta *</label>
+                                <InputNumber
+                                    value={editForm.nuevoPrecioVenta ?? 0}
+                                    onValueChange={(e) => setEditForm({ ...editForm, nuevoPrecioVenta: e.value ?? 0 })}
+                                    mode="currency" currency="CRC" locale="es-CR"
+                                    className={classNames({ 'p-invalid': reqEdit((editForm.nuevoPrecioVenta ?? 0) > 0) })}
+                                />
+                                {reqEdit((editForm.nuevoPrecioVenta ?? 0) > 0) && <small className="p-error">Debe ser mayor a 0.</small>}
+                            </div>
+                        </div>
+
+                        {/* Descuento / Estado */}
+                        <div className="formgrid grid">
+                            <div className="field col">
+                                <label>Descuento</label>
+                                <Dropdown
+                                    value={editForm.nuevoNombreDescuento}
+                                    options={discountOptions}
+                                    onChange={(e) => setEditForm({ ...editForm, nuevoNombreDescuento: e.value })}
+                                    optionLabel="label"
+                                    optionValue="name"
+                                />
+                            </div>
+                            <div className="field col flex flex-column justify-content-center">
+                                <label className="mb-2">Estado</label>
+                                <div className="flex align-items-center gap-2">
+                                    <InputSwitch
+                                        checked={editForm.nuevoEstado ?? true}
+                                        onChange={(e) => setEditForm({ ...editForm, nuevoEstado: e.value })}
+                                    />
+                                    <span>{editForm.nuevoEstado ? 'Activo' : 'Inactivo'}</span>
+                                </div>
+                            </div>
                         </div>
                     </Dialog>
                 </div>

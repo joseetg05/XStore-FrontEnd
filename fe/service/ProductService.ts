@@ -50,6 +50,21 @@ export interface ProductResult {
     error?: string
 }
 
+// ─── Update payload ───────────────────────────────────────────────────────────
+
+export interface UpdateProductPayload {
+    description: string          // identificador (descripción actual)
+    nuevaDescripcion?: string | null
+    nuevaRutaImagen?: string | null
+    nuevoTipoProducto?: string | null
+    nuevaMarcaProducto?: string | null
+    nuevoNombreProveedor?: string | null
+    nuevoPrecioCompra?: number | null
+    nuevoPrecioVenta?: number | null
+    nuevoNombreDescuento?: string | null
+    nuevoEstado?: boolean | null
+}
+
 // ─── Create payload (campos adicionales solo para creación) ──────────────────
 
 export interface CreateProductPayload {
@@ -116,8 +131,10 @@ export const ProductService = {
 
     async getAllProducts(): Promise<Product[]> {
         const u = getCurrentUsername()
+        const qp = new URLSearchParams()
+        if (u) qp.append('nombreUsuario', u)
         try {
-            const data = await apiCall<ApiProduct[]>('GET', `/api/productos?nombreUsuario=${u}`)
+            const data = await apiCall<ApiProduct[]>('GET', `/api/productos?${qp}`)
             return (data ?? []).map((p, i) => fromApi(p, i))
         } catch {
             return []
@@ -127,7 +144,8 @@ export const ProductService = {
     async getActiveProducts(filters?: ProductFilters): Promise<Product[]> {
         const u = getCurrentUsername()
         try {
-            const params = new URLSearchParams({ nombreUsuario: u })
+            const params = new URLSearchParams()
+            if (u) params.append('nombreUsuario', u)
             if (filters?.search) params.append('filtroDescripcion', filters.search)
             if (filters?.type) params.append('filtroTipo', filters.type)
             if (filters?.brand) params.append('filtroMarca', filters.brand)
@@ -155,6 +173,41 @@ export const ProductService = {
 
     getProducts(filters?: ProductFilters): Promise<Product[]> {
         return ProductService.getActiveProducts(filters)
+    },
+
+    async updateProduct(payload: UpdateProductPayload): Promise<ProductResult> {
+        try {
+            await apiCall('PUT', '/api/productos', {
+                nombreUsuario: getCurrentUsername(),
+                descripcion: payload.description,
+                nuevaDescripcion: payload.nuevaDescripcion ?? null,
+                nuevaRutaImagen: payload.nuevaRutaImagen ?? null,
+                nuevoTipoProducto: payload.nuevoTipoProducto ?? null,
+                nuevaMarcaProducto: payload.nuevaMarcaProducto ?? null,
+                nuevoNombreProveedor: payload.nuevoNombreProveedor ?? null,
+                nuevoPrecioCompra: payload.nuevoPrecioCompra ?? null,
+                nuevoPrecioVenta: payload.nuevoPrecioVenta ?? null,
+                nuevoNombreDescuento: payload.nuevoNombreDescuento ?? null,
+                nuevoEstado: payload.nuevoEstado ?? null
+            })
+            return { success: true }
+        } catch (e: unknown) {
+            return { success: false, error: (e as Error).message }
+        }
+    },
+
+    async adjustStock(description: string, ajusteStock: number, nombreUbicacion: string): Promise<ProductResult> {
+        try {
+            await apiCall('PUT', '/api/productos', {
+                nombreUsuario: getCurrentUsername(),
+                descripcion: description,
+                ajusteStock,
+                nombreUbicacion
+            })
+            return { success: true }
+        } catch (e: unknown) {
+            return { success: false, error: (e as Error).message }
+        }
     },
 
     async createProduct(payload: CreateProductPayload): Promise<ProductResult> {

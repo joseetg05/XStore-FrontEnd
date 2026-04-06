@@ -1,6 +1,13 @@
 import { apiCall, getCurrentUsername } from './ApiClient'
 import { AuthService } from './AuthService'
 
+async function hashPassword(password: string): Promise<string> {
+    const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
+    return Array.from(new Uint8Array(buffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface PersonaUser {
@@ -24,6 +31,14 @@ export interface UpdateUserPayload {
     phone: string
     email: string
     address: string
+}
+
+export interface UpdateSessionPayload {
+    nombreUsuarioAModificar: string
+    nuevoNombreUsuario?: string | null
+    nuevaPasswordHash?: string | null
+    nuevoRol?: string | null
+    nuevoEstado?: boolean | null
 }
 
 export interface UserResult {
@@ -111,6 +126,26 @@ export const UserService = {
                 })
             }
 
+            return { success: true }
+        } catch (e: unknown) {
+            return { success: false, error: (e as Error).message }
+        }
+    },
+
+    async updateSession(payload: UpdateSessionPayload): Promise<UserResult> {
+        try {
+            const hashedPassword = payload.nuevaPasswordHash
+                ? await hashPassword(payload.nuevaPasswordHash)
+                : null
+
+            await apiCall('PUT', '/api/sesiones', {
+                nombreUsuario: getCurrentUsername(),
+                nombreUsuarioAModificar: payload.nombreUsuarioAModificar,
+                nuevoNombreUsuario: payload.nuevoNombreUsuario ?? null,
+                nuevaPasswordHash: hashedPassword,
+                nuevoRol: payload.nuevoRol ?? null,
+                nuevoEstado: payload.nuevoEstado ?? null
+            })
             return { success: true }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }
