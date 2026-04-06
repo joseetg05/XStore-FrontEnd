@@ -29,7 +29,8 @@ const SYSTEM_ROUTES = [
     { label: 'Ubicaciones', value: '/admin/inventory-locations' },
     { label: 'Proveedores', value: '/admin/suppliers' },
     { label: 'Usuarios', value: '/admin/users' },
-    { label: 'Roles', value: '/admin/roles' }
+    { label: 'Roles', value: '/admin/roles' },
+    { label: 'Auditorías', value: '/admin/auditorias' }
 ]
 
 const emptyRole: Role = { name: '', accesos: '', status: true }
