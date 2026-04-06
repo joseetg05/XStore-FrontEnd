@@ -30,7 +30,8 @@ const SYSTEM_ROUTES = [
     { label: 'Proveedores', value: '/admin/suppliers' },
     { label: 'Usuarios', value: '/admin/users' },
     { label: 'Roles', value: '/admin/roles' },
-    { label: 'Auditorías', value: '/admin/auditorias' }
+    { label: 'Auditorías', value: '/admin/auditorias' },
+    { label: 'Reportes', value: '/admin/reportes' }
 ]
 
 const emptyRole: Role = { name: '', accesos: '', status: true }

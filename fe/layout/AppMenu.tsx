@@ -48,7 +48,8 @@ const AppMenu = () => {
                 { label: 'Descuentos', icon: 'pi pi-fw pi-ticket', to: '/admin/discounts' },
                 { label: 'Proveedores', icon: 'pi pi-fw pi-truck', to: '/admin/suppliers' },
                 { label: 'Roles', icon: 'pi pi-fw pi-users', to: '/admin/roles' },
-                { label: 'Auditorías', icon: 'pi pi-fw pi-history', to: '/admin/auditorias' }
+                { label: 'Auditorías', icon: 'pi pi-fw pi-history', to: '/admin/auditorias' },
+                { label: 'Reportes', icon: 'pi pi-fw pi-chart-bar', to: '/admin/reportes' }
             ]
         },
         {
