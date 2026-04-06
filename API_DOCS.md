@@ -782,9 +782,9 @@ Registra una entrada de auditoría. **El frontend debe llamar este endpoint desp
  //4. Tipos de Producto — GET + POST + PUT /api/tipos-productos  
  //5. Marcas de Producto — GET + POST + PUT /api/marcas-productos  
  //6. Ubicaciones — GET + POST + PUT /api/ubicaciones  
- 7. Tipos de Persona — GET + POST + PUT /api/tipos-personas  
- 8. Personas — GET /api/personas + PUT /api/personas  
- 9. Usuarios — POST /api/usuarios (registro)
+ //7. Tipos de Persona — GET + POST + PUT /api/tipos-personas  
+ //8. Personas — GET /api/personas + PUT /api/personas  
+ //9. Usuarios — POST /api/usuarios (registro)
 //10. Proveedores — GET /api/proveedores + GET /nombres + POST + PUT  
  //11. Categorías Descuento — GET + POST + PUT /api/cat-descuentos  
  //12. Estados de Entrega — GET + POST + PUT /api/estados-entregas  

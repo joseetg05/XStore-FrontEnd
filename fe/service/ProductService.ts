@@ -116,7 +116,6 @@ export const ProductService = {
 
     async getAllProducts(): Promise<Product[]> {
         const u = getCurrentUsername()
-        if (!u) return []
         try {
             const data = await apiCall<ApiProduct[]>('GET', `/api/productos?nombreUsuario=${u}`)
             return (data ?? []).map((p, i) => fromApi(p, i))
@@ -127,7 +126,6 @@ export const ProductService = {
 
     async getActiveProducts(filters?: ProductFilters): Promise<Product[]> {
         const u = getCurrentUsername()
-        if (!u) return []
         try {
             const params = new URLSearchParams({ nombreUsuario: u })
             if (filters?.search) params.append('filtroDescripcion', filters.search)

@@ -19,7 +19,6 @@ const fromApi = (b: ApiBrand, index: number): Brand => ({
 export const BrandService = {
     async getAll(): Promise<Brand[]> {
         const u = getCurrentUsername()
-        if (!u) return []
         const data = await apiCall<ApiBrand[]>('GET', `/api/marcas-productos?nombreUsuario=${u}`)
         return (data ?? []).map((b, i) => fromApi(b, i))
     },
