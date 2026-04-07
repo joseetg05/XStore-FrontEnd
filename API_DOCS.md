@@ -746,21 +746,21 @@ Modifica datos de un producto existente y/o ajusta su stock.
 }
 ```
 
-| Campo                  | Tipo    | Requerido | Descripción                                                                    |
-| ---------------------- | ------- | --------- | ------------------------------------------------------------------------------ |
-| `nombreUsuario`        | string  | Sí        | Usuario que ejecuta la acción                                                  |
-| `descripcion`          | string  | Sí        | Descripción actual del producto (identificador)                                |
-| `nuevaDescripcion`     | string  | No        | Nueva descripción (`null` = no modificar)                                      |
-| `nuevaRutaImagen`      | string  | No        | Nueva ruta de imagen                                                           |
-| `nuevoTipoProducto`    | string  | No        | Nuevo tipo de producto                                                         |
-| `nuevaMarcaProducto`   | string  | No        | Nueva marca                                                                    |
-| `nuevoNombreProveedor` | string  | No        | Nuevo proveedor                                                                |
-| `nuevoPrecioCompra`    | decimal | No        | Nuevo precio de compra                                                         |
-| `nuevoPrecioVenta`     | decimal | No        | Nuevo precio de venta                                                          |
-| `nuevoNombreDescuento` | string  | No        | Nuevo descuento (`null` = no modificar, `""` = quitar descuento)               |
-| `nuevoEstado`          | boolean | No        | Estado activo/inactivo                                                         |
-| `ajusteStock`          | int     | No        | Ajuste de stock (positivo = ingreso, negativo = salida, `0` = ninguno)         |
-| `nombreUbicacion`      | string  | No        | Ubicación del ajuste de stock (requerido si `ajusteStock != 0`)                |
+| Campo                  | Tipo    | Requerido | Descripción                                                            |
+| ---------------------- | ------- | --------- | ---------------------------------------------------------------------- |
+| `nombreUsuario`        | string  | Sí        | Usuario que ejecuta la acción                                          |
+| `descripcion`          | string  | Sí        | Descripción actual del producto (identificador)                        |
+| `nuevaDescripcion`     | string  | No        | Nueva descripción (`null` = no modificar)                              |
+| `nuevaRutaImagen`      | string  | No        | Nueva ruta de imagen                                                   |
+| `nuevoTipoProducto`    | string  | No        | Nuevo tipo de producto                                                 |
+| `nuevaMarcaProducto`   | string  | No        | Nueva marca                                                            |
+| `nuevoNombreProveedor` | string  | No        | Nuevo proveedor                                                        |
+| `nuevoPrecioCompra`    | decimal | No        | Nuevo precio de compra                                                 |
+| `nuevoPrecioVenta`     | decimal | No        | Nuevo precio de venta                                                  |
+| `nuevoNombreDescuento` | string  | No        | Nuevo descuento (`null` = no modificar, `""` = quitar descuento)       |
+| `nuevoEstado`          | boolean | No        | Estado activo/inactivo                                                 |
+| `ajusteStock`          | int     | No        | Ajuste de stock (positivo = ingreso, negativo = salida, `0` = ninguno) |
+| `nombreUbicacion`      | string  | No        | Ubicación del ajuste de stock (requerido si `ajusteStock != 0`)        |
 
 ---
 
@@ -810,11 +810,11 @@ Registra un nuevo producto e ingresa stock al inventario.
 
 Consulta el stock de productos por ubicación con filtros opcionales.
 
-| Param             | Tipo   | Requerido | Descripción                                      |
-| ----------------- | ------ | --------- | ------------------------------------------------ |
-| `nombreUsuario`   | string | Sí        | Usuario que consulta                             |
-| `filtroUbicacion` | string | No        | Nombre exacto de la ubicación                    |
-| `filtroProducto`  | string | No        | Búsqueda parcial en descripción del producto     |
+| Param             | Tipo   | Requerido | Descripción                                  |
+| ----------------- | ------ | --------- | -------------------------------------------- |
+| `nombreUsuario`   | string | Sí        | Usuario que consulta                         |
+| `filtroUbicacion` | string | No        | Nombre exacto de la ubicación                |
+| `filtroProducto`  | string | No        | Búsqueda parcial en descripción del producto |
 
 **Respuesta `data` (array):**
 
@@ -875,21 +875,322 @@ Registra una entrada de auditoría. **El frontend debe llamar este endpoint desp
 | `antes`         | string | No        | JSON stringify del estado anterior (requerido para UPDATE y DELETE) |
 | `despues`       | string | No        | JSON stringify del estado nuevo (requerido para INSERT y UPDATE)    |
 
-// 1.  Health       — GET /api/health
-// 2.  Sesiones     — PUT + POST /verificar (login) + POST /api/sesiones
-// 3.  Roles        — GET + POST + PUT /api/roles
-// 4.  Tipos Prod.  — GET (público) + POST + PUT /api/tipos-productos
-// 5.  Marcas       — GET (público) + POST + PUT /api/marcas-productos
-// 6.  Ubicaciones  — GET + POST + PUT /api/ubicaciones
-// 7.  Tipos Persona— GET + POST + PUT /api/tipos-personas
-// 8.  Personas     — GET + PUT /api/personas
-// 9.  Usuarios     — POST /api/usuarios (registro)
-// 10. Proveedores  — GET + GET /nombres + POST + PUT /api/proveedores
-// 11. Cat. Desc.   — GET + POST + PUT /api/cat-descuentos
+## Reportes (BI)
+
+Todos los endpoints de reportes requieren 🔒 token de **Administrador** (excepto stock crítico que acepta cualquier sesión activa).
+
+---
+
+### `GET /api/reportes/ventas-categoria-cliente` 🔒
+
+Ingresos clasificados por tipo de cliente (Normal, Frecuente, Premium, etc.).
+
+| Param           | Tipo   | Requerido | Descripción        |
+| --------------- | ------ | --------- | ------------------ |
+| `nombreUsuario` | string | Sí        | Admin que consulta |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "categoriaCliente": "VIP",
+    "totalFacturas": 45,
+    "totalClientes": 12,
+    "subtotal": 150000.0,
+    "descuentosAplicados": 8000.0,
+    "impuestosRecaudados": 18590.0,
+    "totalIngresos": 160590.0,
+    "ticketPromedio": 3568.67
+  }
+]
+```
+
+---
+
+### `GET /api/reportes/ingresos-periodicos` 🔒
+
+Consolidado de ventas totales, impuestos y descuentos agrupados por período.
+
+| Param           | Tipo   | Requerido | Default | Descripción              |
+| --------------- | ------ | --------- | ------- | ------------------------ |
+| `nombreUsuario` | string | Sí        | —       | Admin que consulta       |
+| `periodo`       | string | No        | `MES`   | `DIA` · `SEMANA` · `MES` |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "periodo": "2026-04",
+    "totalFacturas": 120,
+    "subtotal": 480000.0,
+    "descuentosAplicados": 22000.0,
+    "impuestosRecaudados": 59800.0,
+    "costoEnvioTotal": 4500.0,
+    "totalIngresos": 522300.0
+  }
+]
+```
+
+---
+
+### `GET /api/reportes/best-sellers` 🔒
+
+Ranking de productos con mayor volumen de ventas o mayores ingresos netos.
+
+| Param           | Tipo   | Requerido | Default    | Descripción                      |
+| --------------- | ------ | --------- | ---------- | -------------------------------- |
+| `nombreUsuario` | string | Sí        | —          | Admin que consulta               |
+| `top`           | int    | No        | `10`       | Cantidad de productos a retornar |
+| `ordenarPor`    | string | No        | `UNIDADES` | `UNIDADES` · `INGRESOS`          |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "ranking": 1,
+    "producto": "Laptop HP 15 pulgadas",
+    "tipo": "Computadoras",
+    "marca": "HP",
+    "unidadesVendidas": 85,
+    "numeroFacturas": 72,
+    "ingresosBrutos": 42415000.0,
+    "descuentosAplicados": 2100000.0,
+    "ingresosNetos": 40315000.0
+  }
+]
+```
+
+---
+
+### `GET /api/reportes/margen-utilidad` 🔒
+
+Comparativa entre costo de compra y precio efectivo de venta post-descuento por producto.
+
+| Param           | Tipo   | Requerido | Descripción                        |
+| --------------- | ------ | --------- | ---------------------------------- |
+| `nombreUsuario` | string | Sí        | Admin que consulta                 |
+| `filtroTipo`    | string | No        | Nombre exacto del tipo de producto |
+| `filtroMarca`   | string | No        | Nombre exacto de la marca          |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "producto": "Laptop HP 15 pulgadas",
+    "tipo": "Computadoras",
+    "marca": "HP",
+    "precioCompra": 350000.0,
+    "precioVentaLista": 499000.0,
+    "precioEfectivoPromedio": 475050.0,
+    "margenUnitario": 125050.0,
+    "margenPct": 26.32,
+    "unidadesVendidas": 85,
+    "ingresosNetos": 40315000.0,
+    "utilidadTotal": 10629250.0
+  }
+]
+```
+
+---
+
+### `GET /api/reportes/desempeno-marca` 🔒
+
+Ventas agrupadas por fabricante — identifica qué marcas dominan el mercado.
+
+| Param           | Tipo   | Requerido | Descripción        |
+| --------------- | ------ | --------- | ------------------ |
+| `nombreUsuario` | string | Sí        | Admin que consulta |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "ranking": 1,
+    "marca": "Samsung",
+    "totalProductos": 12,
+    "unidadesVendidas": 340,
+    "numeroFacturas": 290,
+    "ingresosBrutos": 95000000.0,
+    "descuentosAplicados": 4800000.0,
+    "ingresosNetos": 90200000.0,
+    "precioPromedioVenta": 264705.88
+  }
+]
+```
+
+---
+
+### `GET /api/reportes/stock-critico` 🔒
+
+Productos por debajo de su stock mínimo en cada bodega.
+
+| Param             | Tipo   | Requerido | Descripción                   |
+| ----------------- | ------ | --------- | ----------------------------- |
+| `nombreUsuario`   | string | Sí        | Usuario con sesión activa     |
+| `filtroUbicacion` | string | No        | Nombre exacto de la ubicación |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "ubicacion": "Bodega A",
+    "producto": "Cable HDMI 2m",
+    "tipo": "Accesorios",
+    "marca": "Genérico",
+    "stockMinimo": 10,
+    "stockActual": 2,
+    "unidadesFaltantes": 8,
+    "costoReposicion": 12000.0
+  }
+]
+```
+
+---
+
+### `GET /api/reportes/valorizacion-inventario` 🔒
+
+Valor monetario total del inventario basado en precio de compra y precio de venta.
+
+| Param             | Tipo   | Requerido | Descripción                        |
+| ----------------- | ------ | --------- | ---------------------------------- |
+| `nombreUsuario`   | string | Sí        | Admin que consulta                 |
+| `filtroUbicacion` | string | No        | Nombre exacto de la ubicación      |
+| `filtroTipo`      | string | No        | Nombre exacto del tipo de producto |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "ubicacion": "Bodega A",
+    "producto": "Laptop HP 15 pulgadas",
+    "tipo": "Computadoras",
+    "marca": "HP",
+    "precioCompra": 350000.0,
+    "precioVenta": 499000.0,
+    "stockActual": 8,
+    "valorCosto": 2800000.0,
+    "valorVenta": 3992000.0,
+    "utilidadPotencial": 1192000.0
+  }
+]
+```
+
+---
+
+### `GET /api/reportes/productos-sin-movimiento` 🔒
+
+Artículos sin ventas en el período indicado — candidatos a liquidación.
+
+| Param             | Tipo   | Requerido | Default | Descripción                                          |
+| ----------------- | ------ | --------- | ------- | ---------------------------------------------------- |
+| `nombreUsuario`   | string | Sí        | —       | Admin que consulta                                   |
+| `diasInactividad` | int    | No        | `90`    | Días sin ventas para considerar un producto inactivo |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "producto": "Auriculares Bluetooth XZ",
+    "tipo": "Audio",
+    "marca": "Sony",
+    "precioCompra": 25000.0,
+    "precioVenta": 39000.0,
+    "stockTotal": 15,
+    "valorInmovilizado": 375000.0,
+    "ultimaVenta": "2025-12-01",
+    "diasInactivo": 125
+  }
+]
+```
+
+---
+
+### `GET /api/reportes/clientes-inactivos` 🔒
+
+Clientes que no han comprado en el período indicado — para campañas de re-marketing.
+
+| Param             | Tipo   | Requerido | Default | Descripción                                          |
+| ----------------- | ------ | --------- | ------- | ---------------------------------------------------- |
+| `nombreUsuario`   | string | Sí        | —       | Admin que consulta                                   |
+| `diasInactividad` | int    | No        | `180`   | Días sin compras para considerar un cliente inactivo |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "nombreCliente": "María González",
+    "identificacion": "1-2345-6789",
+    "correo": "maria@ejemplo.com",
+    "telefono": "8888-0000",
+    "categoriaCliente": "Cliente Normal",
+    "fechaRegistro": "2024-03-15",
+    "totalCompras": 3,
+    "totalGastado": 85000.0,
+    "ultimaCompra": "2025-09-10",
+    "diasDesdeUltimaCompra": 207
+  }
+]
+```
+
+---
+
+### `GET /api/reportes/entregas-pendientes` 🔒
+
+Estado en tiempo real de envíos a domicilio con alerta de atraso.
+
+| Param           | Tipo   | Requerido | Default | Descripción                                             |
+| --------------- | ------ | --------- | ------- | ------------------------------------------------------- |
+| `nombreUsuario` | string | Sí        | —       | Usuario con sesión activa                               |
+| `soloAtrasadas` | bool   | No        | `false` | `true` = solo las que están atrasadas o vencen hoy      |
+| `filtroEstado`  | string | No        | —       | Nombre exacto del estado de entrega (ej: `"En camino"`) |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "numeroFactura": "FAC-0001",
+    "cliente": "Juan Pérez",
+    "telefono": "7777-1234",
+    "correo": "juan@ejemplo.com",
+    "fechaFactura": "2026-03-28",
+    "totalFactura": 75000.0,
+    "direccionEntrega": "San José, Costa Rica",
+    "fechaEntregaCompromiso": "2026-04-02",
+    "estadoEntrega": "En camino",
+    "observaciones": null,
+    "diasRetraso": 3,
+    "alertaEntrega": "ATRASADA"
+  }
+]
+```
+
+> `alertaEntrega` puede ser `"EN TIEMPO"`, `"VENCE HOY"` o `"ATRASADA"`.
+
+// 1. Health — GET /api/health
+// 2. Sesiones — PUT + POST /verificar (login) + POST /api/sesiones
+// 3. Roles — GET + POST + PUT /api/roles
+// 4. Tipos Prod. — GET (público) + POST + PUT /api/tipos-productos
+// 5. Marcas — GET (público) + POST + PUT /api/marcas-productos
+// 6. Ubicaciones — GET + POST + PUT /api/ubicaciones
+// 7. Tipos Persona— GET + POST + PUT /api/tipos-personas
+// 8. Personas — GET + PUT /api/personas
+// 9. Usuarios — POST /api/usuarios (registro)
+// 10. Proveedores — GET + GET /nombres + POST + PUT /api/proveedores
+// 11. Cat. Desc. — GET + POST + PUT /api/cat-descuentos
 // 12. Est. Entrega — GET + POST + PUT /api/estados-entregas
-// 13. Descuentos   — GET (público) + POST + PUT /api/descuentos
-// 14. Productos    — GET (público) + POST + PUT /api/productos
-// 15. Inventario   — GET /api/inventario
-// 16. Auditorías   — GET + POST /api/auditorias
+// 13. Descuentos — GET (público) + POST + PUT /api/descuentos
+// 14. Productos — GET (público) + POST + PUT /api/productos
+// 15. Inventario — GET /api/inventario
+// 16. Auditorías — GET + POST /api/auditorias
 
 // TODO: proceder con el pago
