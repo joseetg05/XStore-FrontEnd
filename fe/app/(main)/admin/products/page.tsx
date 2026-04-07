@@ -6,6 +6,7 @@ import { Column } from 'primereact/column'
 import { DataTable } from 'primereact/datatable'
 import { Dialog } from 'primereact/dialog'
 import { Dropdown } from 'primereact/dropdown'
+import { FileUpload, FileUploadHandlerEvent } from 'primereact/fileupload'
 import { InputNumber } from 'primereact/inputnumber'
 import { InputSwitch } from 'primereact/inputswitch'
 import { InputText } from 'primereact/inputtext'
@@ -63,6 +64,49 @@ const AdminProductsPage = () => {
     const [providers, setProviders] = useState<string[]>([])
     const [locations, setLocations] = useState<string[]>([])
     const [discountOptions, setDiscountOptions] = useState<DropdownOption[]>([])
+    const fileUploadRef = useRef<FileUpload>(null)
+    const editFileUploadRef = useRef<FileUpload>(null)
+    const [uploadedUrl, setUploadedUrl] = useState<string | null>(null)
+    const [editUploadedUrl, setEditUploadedUrl] = useState<string | null>(null)
+
+    const handleUpload = async (e: FileUploadHandlerEvent, mode: 'create' | 'edit') => {
+        const file = e.files[0]
+        if (!file) return
+        const fd = new FormData()
+        fd.append('file', file)
+        try {
+            const res = await fetch('/api/product-images', { method: 'POST', body: fd })
+            const data = await res.json()
+            if (data.url) {
+                if (mode === 'create') {
+                    setForm((prev) => ({ ...prev, imageUrl: data.url }))
+                    setUploadedUrl(data.url)
+                } else {
+                    setEditForm((prev) => ({ ...prev, nuevaRutaImagen: data.url }))
+                    setEditUploadedUrl(data.url)
+                }
+                toast.current?.show({ severity: 'success', summary: 'Imagen subida', detail: file.name, life: 2000 })
+            }
+        } catch {
+            toast.current?.show({ severity: 'error', summary: 'Error', detail: 'No se pudo subir la imagen', life: 3000 })
+        }
+    }
+
+    const removeUploadedImage = async (url: string | null, mode: 'create' | 'edit') => {
+        if (!url || !url.startsWith('/imagenes-productos/')) return
+        try {
+            await fetch('/api/product-images', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
+        } catch { /* ignore */ }
+        if (mode === 'create') {
+            setForm((prev) => ({ ...prev, imageUrl: '' }))
+            setUploadedUrl(null)
+            fileUploadRef.current?.clear()
+        } else {
+            setEditForm((prev) => ({ ...prev, nuevaRutaImagen: '' }))
+            setEditUploadedUrl(null)
+            editFileUploadRef.current?.clear()
+        }
+    }
 
     useEffect(() => {
         loadData()
@@ -85,10 +129,12 @@ const AdminProductsPage = () => {
     const openNew = () => {
         setForm(emptyForm)
         setSubmitted(false)
+        setUploadedUrl(null)
         setProductDialog(true)
     }
 
-    const hideDialog = () => {
+    const hideDialog = async () => {
+        if (uploadedUrl) await removeUploadedImage(uploadedUrl, 'create')
         setSubmitted(false)
         setProductDialog(false)
     }
@@ -111,6 +157,7 @@ const AdminProductsPage = () => {
         const result = await ProductService.createProduct(form)
         if (result.success) {
             toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Producto registrado correctamente', life: 3000 })
+            setUploadedUrl(null)
             setProductDialog(false)
             setForm(emptyForm)
             loadData()
@@ -181,6 +228,7 @@ const AdminProductsPage = () => {
             status: product.status
         })
         setEditSubmitted(false)
+        setEditUploadedUrl(null)
         setEditDialog(true)
     }
 
@@ -202,6 +250,7 @@ const AdminProductsPage = () => {
         })
         if (result.success) {
             toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Producto actualizado correctamente', life: 3000 })
+            setEditUploadedUrl(null)
             setEditDialog(false)
             loadData()
         } else {
@@ -275,6 +324,24 @@ const AdminProductsPage = () => {
                                 value={form.imageUrl}
                                 onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
                                 placeholder="https://..."
+                            />
+                        </div>
+
+                        {/* Upload Imagen */}
+                        <div className="field">
+                            <label>O subir imagen desde tu equipo</label>
+                            <FileUpload
+                                ref={fileUploadRef}
+                                mode="advanced"
+                                accept="image/*"
+                                maxFileSize={5000000}
+                                customUpload
+                                uploadHandler={(e) => handleUpload(e, 'create')}
+                                auto
+                                chooseLabel="Seleccionar imagen"
+                                onRemove={() => removeUploadedImage(uploadedUrl, 'create')}
+                                onClear={() => removeUploadedImage(uploadedUrl, 'create')}
+                                emptyTemplate={<p className="m-0 text-500 text-sm">Arrastra una imagen aquí o haz clic para seleccionar.</p>}
                             />
                         </div>
 
@@ -431,6 +498,24 @@ const AdminProductsPage = () => {
                                 value={editForm.nuevaRutaImagen ?? ''}
                                 onChange={(e) => setEditForm({ ...editForm, nuevaRutaImagen: e.target.value })}
                                 placeholder="https://..."
+                            />
+                        </div>
+
+                        {/* Upload Imagen */}
+                        <div className="field">
+                            <label>O subir imagen desde tu equipo</label>
+                            <FileUpload
+                                ref={editFileUploadRef}
+                                mode="advanced"
+                                accept="image/*"
+                                maxFileSize={5000000}
+                                customUpload
+                                uploadHandler={(e) => handleUpload(e, 'edit')}
+                                auto
+                                chooseLabel="Seleccionar imagen"
+                                onRemove={() => removeUploadedImage(editUploadedUrl, 'edit')}
+                                onClear={() => removeUploadedImage(editUploadedUrl, 'edit')}
+                                emptyTemplate={<p className="m-0 text-500 text-sm">Arrastra una imagen aquí o haz clic para seleccionar.</p>}
                             />
                         </div>
 

@@ -7,7 +7,6 @@ import { InputNumber } from 'primereact/inputnumber';
 import { Sidebar } from 'primereact/sidebar';
 
 import { useCart } from '../../../context/CartContext';
-import { Discount, ProductService } from '../../../service/ProductService';
 import { AuthService } from '../../../service/AuthService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -26,12 +25,7 @@ interface CartSidebarProps {
 
 const CartSidebar = ({ visible, onHide }: CartSidebarProps) => {
     const router = useRouter();
-    const { cartItems, removeFromCart, updateQuantity, clearCart, getTotals } = useCart();
-    const [discounts, setDiscounts] = React.useState<Discount[]>([]);
-
-    React.useEffect(() => {
-        ProductService.getDiscounts().then(setDiscounts);
-    }, []);
+    const { cartItems, discounts, clientDiscountPct, removeFromCart, updateQuantity, clearCart, getTotals } = useCart();
 
     const { totalItems, subtotal, total } = getTotals();
     const isEmpty = cartItems.length === 0;
@@ -67,11 +61,21 @@ const CartSidebar = ({ visible, onHide }: CartSidebarProps) => {
                     </div>
                 ) : (
                     <>
+                        {/* ── Client Discount Banner ── */}
+                        {clientDiscountPct > 0 && (
+                            <div className="flex align-items-center gap-2 p-2 mb-3 border-round" style={{ background: 'var(--green-50)', border: '1px solid var(--green-200)' }}>
+                                <i className="pi pi-percentage text-green-600" />
+                                <span className="text-green-700 text-sm font-medium">Descuento de categoría: {clientDiscountPct}% aplicado</span>
+                            </div>
+                        )}
+
                         {/* ── Item List ── */}
                         <div className="flex flex-column gap-3 flex-1 overflow-y-auto pb-3">
                             {cartItems.map((item) => {
                                 const discount = discounts.find((d) => d.name === item.product.discountName);
-                                const unitPrice = discount ? item.product.salePrice * (1 - discount.percentage / 100) : item.product.salePrice;
+                                let unitPrice = discount ? item.product.salePrice * (1 - discount.percentage / 100) : item.product.salePrice;
+                                if (clientDiscountPct > 0) unitPrice = unitPrice * (1 - clientDiscountPct / 100);
+                                const hasAnyDiscount = !!discount || clientDiscountPct > 0;
                                 const lineTotal = unitPrice * item.quantity;
 
                                 return (
@@ -95,10 +99,10 @@ const CartSidebar = ({ visible, onHide }: CartSidebarProps) => {
                                                 {item.product.description}
                                             </span>
                                             <div className="flex align-items-center gap-2">
-                                                <span className="text-900 font-medium text-xs" style={{ color: discount ? '#e91e63' : 'inherit' }}>
+                                                <span className="text-900 font-medium text-xs" style={{ color: hasAnyDiscount ? '#e91e63' : 'inherit' }}>
                                                     {formatCurrency(unitPrice)}
                                                 </span>
-                                                {discount && (
+                                                {hasAnyDiscount && (
                                                     <span className="text-500 text-xs line-through">{formatCurrency(item.product.salePrice)}</span>
                                                 )}
                                                 <span className="text-500 text-xs">/ unidad</span>
@@ -152,6 +156,12 @@ const CartSidebar = ({ visible, onHide }: CartSidebarProps) => {
                                 <span>Subtotal</span>
                                 <span className="font-medium text-900">{formatCurrency(subtotal)}</span>
                             </div>
+                            {clientDiscountPct > 0 && (
+                                <div className="flex justify-content-between text-sm mb-1">
+                                    <span className="text-green-600"><i className="pi pi-percentage text-xs mr-1" />Desc. categoría ({clientDiscountPct}%)</span>
+                                    <span className="font-medium text-green-600">Incluido</span>
+                                </div>
+                            )}
                             <Divider className="my-2" />
                             <div className="flex justify-content-between text-base font-bold text-900 mb-3">
                                 <span>Total</span>
