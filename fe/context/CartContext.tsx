@@ -18,6 +18,8 @@ export interface CartTotals {
 interface CartContextValue {
     cartItems: CartItem[];
     discounts: Discount[];
+    clientDiscountPct: number;
+    setClientDiscountPct: (pct: number) => void;
     addToCart: (product: Product) => void;
     removeFromCart: (productId: number) => void;
     updateQuantity: (productId: number, quantity: number) => void;
@@ -58,6 +60,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     // localStorage is only available in the browser.
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [discounts, setDiscounts] = useState<Discount[]>([]);
+    const [clientDiscountPct, setClientDiscountPct] = useState(0);
     const [hydrated, setHydrated] = useState(false);
 
     // Hydrate from localStorage once we are on the client
@@ -116,15 +119,16 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
         const subtotal = cartItems.reduce((sum, item) => {
             const discount = discounts.find((d) => d.name === item.product.discountName);
-            const price = discount ? item.product.salePrice * (1 - discount.percentage / 100) : item.product.salePrice;
+            let price = discount ? item.product.salePrice * (1 - discount.percentage / 100) : item.product.salePrice;
+            if (clientDiscountPct > 0) price = price * (1 - clientDiscountPct / 100);
             return sum + price * item.quantity;
         }, 0);
 
         return { totalItems, subtotal, total: subtotal };
-    }, [cartItems, discounts]);
+    }, [cartItems, discounts, clientDiscountPct]);
 
     return (
-        <CartContext.Provider value={{ cartItems, discounts, addToCart, removeFromCart, updateQuantity, clearCart, getTotals }}>
+        <CartContext.Provider value={{ cartItems, discounts, clientDiscountPct, setClientDiscountPct, addToCart, removeFromCart, updateQuantity, clearCart, getTotals }}>
             {children}
         </CartContext.Provider>
     );

@@ -41,6 +41,19 @@ export interface UpdateSessionPayload {
     nuevoEstado?: boolean | null
 }
 
+export interface CreateUserPayload {
+    identificacion: string
+    nombreCompleto: string
+    telefono?: string
+    correo?: string
+    direccion?: string
+    tipoPersona?: string
+    newUser: string
+    password: string
+    nombreRol: string
+    esProveedor?: boolean
+}
+
 export interface UserResult {
     success: boolean
     error?: string
@@ -126,6 +139,28 @@ export const UserService = {
                 })
             }
 
+            return { success: true }
+        } catch (e: unknown) {
+            return { success: false, error: (e as Error).message }
+        }
+    },
+
+    async createUser(payload: CreateUserPayload): Promise<UserResult> {
+        try {
+            const hashedPassword = await hashPassword(payload.password)
+            await apiCall('POST', '/api/usuarios', {
+                nombreUsuario: getCurrentUsername() || null,
+                identificacion: payload.identificacion,
+                nombreCompleto: payload.nombreCompleto,
+                telefono: payload.telefono || null,
+                correo: payload.correo || null,
+                direccion: payload.direccion || null,
+                tipoPersona: payload.tipoPersona || null,
+                newUser: payload.newUser,
+                passwordHash: hashedPassword,
+                nombreRol: payload.nombreRol,
+                esProveedor: payload.esProveedor ?? false
+            })
             return { success: true }
         } catch (e: unknown) {
             return { success: false, error: (e as Error).message }

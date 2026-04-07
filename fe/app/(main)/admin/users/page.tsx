@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { Button } from 'primereact/button'
+import { Dialog } from 'primereact/dialog'
 import { Divider } from 'primereact/divider'
 import { Dropdown } from 'primereact/dropdown'
 import { InputSwitch } from 'primereact/inputswitch'
@@ -10,7 +11,7 @@ import { Password } from 'primereact/password'
 import { Toast } from 'primereact/toast'
 import { classNames } from 'primereact/utils'
 
-import { PersonaUser, UserService } from '@/service/UserService'
+import { CreateUserPayload, PersonaUser, UserService } from '@/service/UserService'
 import { RoleService } from '@/service/RoleService'
 
 const AdminUsersPage = () => {
@@ -30,6 +31,14 @@ const AdminUsersPage = () => {
     const [sessionEstado, setSessionEstado] = useState(true)
     const [sessionPassword, setSessionPassword] = useState('')
 
+    // Nuevo usuario
+    const emptyNewUser: CreateUserPayload = { identificacion: '', nombreCompleto: '', telefono: '', correo: '', direccion: '', tipoPersona: '', newUser: '', password: '', nombreRol: '', esProveedor: false }
+    const [showNewDialog, setShowNewDialog] = useState(false)
+    const [newUser, setNewUser] = useState<CreateUserPayload>({ ...emptyNewUser })
+    const [newSubmitted, setNewSubmitted] = useState(false)
+    const [creatingUser, setCreatingUser] = useState(false)
+    const [tipoPersonaOptions, setTipoPersonaOptions] = useState<string[]>([])
+
     useEffect(() => {
         UserService.getAll().then((data) => {
             setUsers(data)
@@ -42,7 +51,55 @@ const AdminUsersPage = () => {
             setLoading(false)
         })
         RoleService.getAll().then((roles) => setRoleOptions(roles.map((r) => r.name)))
+        import('@/service/ApiClient').then(({ apiCall, getCurrentUsername }) => {
+            const u = getCurrentUsername()
+            if (u) {
+                apiCall<Record<string, unknown>[]>('GET', `/api/tipos-personas?nombreUsuario=${encodeURIComponent(u)}`).then((data) => {
+                    setTipoPersonaOptions(
+                        (data ?? []).map((tp) => {
+                            if (typeof tp === 'string') return tp
+                            const nameKey = Object.keys(tp).find((k) => k.toLowerCase().includes('nombre') || k.toLowerCase().includes('tipo'))
+                            return nameKey ? String(tp[nameKey]) : String(Object.values(tp)[0])
+                        })
+                    )
+                }).catch(() => {})
+            }
+        })
     }, [])
+
+    const openNewDialog = () => {
+        setNewUser({ ...emptyNewUser })
+        setNewSubmitted(false)
+        setShowNewDialog(true)
+    }
+
+    const handleCreateUser = async () => {
+        setNewSubmitted(true)
+        if (!newUser.identificacion.trim() || !newUser.nombreCompleto.trim() || !newUser.newUser.trim() || !newUser.password.trim() || !newUser.nombreRol) return
+
+        setCreatingUser(true)
+        const result = await UserService.createUser(newUser)
+        setCreatingUser(false)
+
+        if (result.success) {
+            toast.current?.show({ severity: 'success', summary: 'Éxito', detail: 'Usuario creado correctamente', life: 3000 })
+            setShowNewDialog(false)
+            // Recargar lista
+            const data = await UserService.getAll()
+            setUsers(data)
+            if (data.length > 0) {
+                const lastIndex = data.length - 1
+                setCurrentIndex(lastIndex)
+                setForm({ ...data[lastIndex] })
+                setSessionUsername(data[lastIndex].username || '')
+                setSessionRol(data[lastIndex].role || '')
+                setSessionEstado(data[lastIndex].estado === 'Activo')
+                setSessionPassword('')
+            }
+        } else {
+            toast.current?.show({ severity: 'error', summary: 'Error', detail: result.error ?? 'No se pudo crear el usuario', life: 4000 })
+        }
+    }
 
     const goTo = (index: number) => {
         setCurrentIndex(index)
@@ -86,6 +143,7 @@ const AdminUsersPage = () => {
                     <div className="card flex flex-column align-items-center justify-content-center py-8 gap-3">
                         <i className="pi pi-users" style={{ fontSize: '3rem', color: 'var(--text-color-secondary)' }} />
                         <h4 className="m-0 text-900">No hay usuarios registrados</h4>
+                        <Button label="Agregar Usuario" icon="pi pi-plus" onClick={openNewDialog} />
                     </div>
                 </div>
             </div>
@@ -117,6 +175,13 @@ const AdminUsersPage = () => {
 
                         {/* Navegación carrusel */}
                         <div className="flex align-items-center gap-2">
+                            <Button
+                                icon="pi pi-plus"
+                                label="Nuevo"
+                                rounded
+                                style={{ color: 'white', border: '1px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.15)' }}
+                                onClick={openNewDialog}
+                            />
                             <Button
                                 icon="pi pi-chevron-left"
                                 rounded
@@ -293,7 +358,7 @@ const AdminUsersPage = () => {
                                 </label>
                                 <Dropdown
                                     value={sessionRol}
-                                    options={roleOptions.map((r) => ({ label: r, value: r }))}
+                                    options={roleOptions}
                                     onChange={(e) => setSessionRol(e.value)}
                                     placeholder="Seleccionar rol"
                                     className="w-full"
@@ -362,6 +427,84 @@ const AdminUsersPage = () => {
                     </div>
                 </div>
             )}
+
+            {/* Dialog Nuevo Usuario */}
+            <Dialog
+                header="Nuevo Usuario"
+                visible={showNewDialog}
+                style={{ width: '650px' }}
+                modal
+                draggable={false}
+                onHide={() => setShowNewDialog(false)}
+                footer={
+                    <div className="flex justify-content-end gap-2">
+                        <Button label="Cancelar" icon="pi pi-times" severity="secondary" text onClick={() => setShowNewDialog(false)} />
+                        <Button label="Crear Usuario" icon="pi pi-check" loading={creatingUser} onClick={handleCreateUser} />
+                    </div>
+                }
+            >
+                <div className="formgrid grid">
+                    <div className="field col-12 md:col-6">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-credit-card mr-1" />Identificación <span className="text-red-400">*</span></label>
+                        <InputText value={newUser.identificacion} onChange={(e) => setNewUser({ ...newUser, identificacion: e.target.value })} className={classNames('w-full', { 'p-invalid': newSubmitted && !newUser.identificacion.trim() })} placeholder="Ej: 1-1234-5678" />
+                        {newSubmitted && !newUser.identificacion.trim() && <small className="p-error">La identificación es obligatoria.</small>}
+                    </div>
+
+                    <div className="field col-12 md:col-6">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-user mr-1" />Nombre Completo <span className="text-red-400">*</span></label>
+                        <InputText value={newUser.nombreCompleto} onChange={(e) => setNewUser({ ...newUser, nombreCompleto: e.target.value })} className={classNames('w-full', { 'p-invalid': newSubmitted && !newUser.nombreCompleto.trim() })} placeholder="Nombre completo" />
+                        {newSubmitted && !newUser.nombreCompleto.trim() && <small className="p-error">El nombre es obligatorio.</small>}
+                    </div>
+
+                    <div className="field col-12 md:col-6">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-phone mr-1" />Teléfono</label>
+                        <InputText value={newUser.telefono} onChange={(e) => setNewUser({ ...newUser, telefono: e.target.value })} className="w-full" placeholder="Ej: 8888-8888" />
+                    </div>
+
+                    <div className="field col-12 md:col-6">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-envelope mr-1" />Correo</label>
+                        <InputText value={newUser.correo} onChange={(e) => setNewUser({ ...newUser, correo: e.target.value })} className="w-full" placeholder="correo@ejemplo.com" />
+                    </div>
+
+                    <div className="field col-12">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-map-marker mr-1" />Dirección</label>
+                        <InputText value={newUser.direccion} onChange={(e) => setNewUser({ ...newUser, direccion: e.target.value })} className="w-full" placeholder="Ej: San José, Costa Rica" />
+                    </div>
+
+                    <div className="col-12"><Divider /></div>
+
+                    <div className="field col-12 md:col-6">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-at mr-1" />Username <span className="text-red-400">*</span></label>
+                        <InputText value={newUser.newUser} onChange={(e) => setNewUser({ ...newUser, newUser: e.target.value })} className={classNames('w-full', { 'p-invalid': newSubmitted && !newUser.newUser.trim() })} placeholder="Username de login" />
+                        {newSubmitted && !newUser.newUser.trim() && <small className="p-error">El username es obligatorio.</small>}
+                    </div>
+
+                    <div className="field col-12 md:col-6">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-key mr-1" />Contraseña <span className="text-red-400">*</span></label>
+                        <Password value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className={classNames('w-full', { 'p-invalid': newSubmitted && !newUser.password.trim() })} inputClassName="w-full" placeholder="Contraseña" feedback={false} toggleMask />
+                        {newSubmitted && !newUser.password.trim() && <small className="p-error">La contraseña es obligatoria.</small>}
+                    </div>
+
+                    <div className="field col-12 md:col-6">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-shield mr-1" />Rol <span className="text-red-400">*</span></label>
+                        <Dropdown value={newUser.nombreRol} options={roleOptions} onChange={(e) => setNewUser({ ...newUser, nombreRol: e.value })} placeholder="Seleccionar rol" className={classNames('w-full', { 'p-invalid': newSubmitted && !newUser.nombreRol })} />
+                        {newSubmitted && !newUser.nombreRol && <small className="p-error">El rol es obligatorio.</small>}
+                    </div>
+
+                    <div className="field col-12 md:col-6">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-tag mr-1" />Tipo de Persona</label>
+                        <Dropdown value={newUser.tipoPersona} options={tipoPersonaOptions} onChange={(e) => setNewUser({ ...newUser, tipoPersona: e.value })} placeholder="Seleccionar tipo" className="w-full" />
+                    </div>
+
+                    <div className="field col-12 md:col-6 flex flex-column justify-content-center">
+                        <label className="font-medium text-700 text-sm block mb-2"><i className="pi pi-box mr-1" />¿Es proveedor?</label>
+                        <div className="flex align-items-center gap-3">
+                            <InputSwitch checked={newUser.esProveedor ?? false} onChange={(e) => setNewUser({ ...newUser, esProveedor: e.value })} />
+                            <span className="font-medium">{newUser.esProveedor ? 'Sí' : 'No'}</span>
+                        </div>
+                    </div>
+                </div>
+            </Dialog>
         </div>
     )
 }

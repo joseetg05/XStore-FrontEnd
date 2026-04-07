@@ -292,14 +292,13 @@ const FilterSidebar = ({ visible, onHide, productTypes, brands, selectedType, se
 // ─── Shop Page ────────────────────────────────────────────────────────────────
 
 const ShopPage = () => {
-    const { addToCart, getTotals, discounts } = useCart();
+    const { addToCart, getTotals, discounts, clientDiscountPct, setClientDiscountPct } = useCart();
     const { totalItems } = getTotals();
 
     const [products, setProducts] = useState<Product[]>([]);
     const [productTypes, setProductTypes] = useState<ProductType[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
     const [loading, setLoading] = useState(true);
-    const [clientDiscountPct, setClientDiscountPct] = useState(0);
     const [clientDiscountLabel, setClientDiscountLabel] = useState('');
 
     const [filterVisible, setFilterVisible] = useState(false);

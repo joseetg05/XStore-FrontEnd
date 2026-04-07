@@ -10,14 +10,14 @@ import AppSidebar from './AppSidebar';
 import AppTopbar from './AppTopbar';
 import AppConfig from './AppConfig';
 import { LayoutContext } from './context/layoutcontext';
-import { PrimeReactContext } from 'primereact/api';
+import { PrimeReactContext, addLocale } from 'primereact/api';
 import { ChildContainerProps, LayoutState, AppTopbarRef } from '@/types';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { AuthService } from '@/service/AuthService';
 
 const Layout = ({ children }: ChildContainerProps) => {
     const { layoutConfig, layoutState, setLayoutState } = useContext(LayoutContext);
-    const { setRipple } = useContext(PrimeReactContext);
+    const { setRipple, setLocale } = useContext(PrimeReactContext);
     const topbarRef = useRef<AppTopbarRef>(null);
     const sidebarRef = useRef<HTMLDivElement>(null);
     const [bindMenuOutsideClickListener, unbindMenuOutsideClickListener] = useEventListener({
@@ -45,6 +45,11 @@ const Layout = ({ children }: ChildContainerProps) => {
     useEffect(() => {
         setIsAuthenticated(AuthService.isAuthenticated());
     }, [pathname]);
+
+    useMountEffect(() => {
+        addLocale('es', { pending: 'Pendiente', upload: 'Subir', cancel: 'Cancelar', choose: 'Seleccionar', fileSizeTypes: ['B', 'KB', 'MB', 'GB', 'TB'] });
+        setLocale?.('es');
+    });
 
     useEffect(() => {
         hideMenu();
