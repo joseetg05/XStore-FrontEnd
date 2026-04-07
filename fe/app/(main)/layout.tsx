@@ -6,7 +6,7 @@ import Layout from '../../layout/layout';
 import { AuthService } from '../../service/AuthService';
 
 const PUBLIC_ROUTES = ['/shop'];
-const AUTH_ROUTES = ['/checkout', '/profile']; // accesibles para cualquier usuario logueado
+const AUTH_ROUTES = ['/checkout', '/profile', '/mis-entregas', '/mis-facturas']; // accesibles para cualquier usuario logueado
 
 interface AppLayoutProps {
     children: React.ReactNode;

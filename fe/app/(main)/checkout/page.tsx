@@ -12,6 +12,8 @@ import { Tag } from 'primereact/tag';
 
 import { useCart } from '../../../context/CartContext';
 import { AuthService, User } from '../../../service/AuthService';
+import { FacturacionService, buildFacturaPayload } from '../../../service/FacturacionService';
+import { UserService } from '../../../service/UserService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -23,8 +25,16 @@ const formatCardNumber = (raw: string) =>
 
 const formatExpiry = (raw: string) => {
     const digits = raw.replace(/\D/g, '').slice(0, 4);
-    if (digits.length >= 3) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    return digits;
+    if (digits.length === 0) return '';
+    // Corregir mes al completar los 2 dígitos
+    let mm = digits.slice(0, 2);
+    if (mm.length === 2) {
+        const m = parseInt(mm, 10);
+        if (m === 0) mm = '01';
+        else if (m > 12) mm = '12';
+    }
+    if (digits.length >= 3) return `${mm}/${digits.slice(2)}`;
+    return mm;
 };
 
 // ─── Installment Options ──────────────────────────────────────────────────────
@@ -39,7 +49,13 @@ const INSTALLMENT_OPTIONS = [
 
 // ─── Success Screen ───────────────────────────────────────────────────────────
 
-const SuccessScreen = ({ onContinue }: { onContinue: () => void }) => (
+interface SuccessScreenProps {
+    onContinue: () => void
+    invoiceNumber?: string
+    upgrade?: { anterior: string; actual: string; mensaje: string } | null
+}
+
+const SuccessScreen = ({ onContinue, invoiceNumber, upgrade }: SuccessScreenProps) => (
     <div className="flex flex-column align-items-center justify-content-center py-8 gap-4 text-center" style={{ minHeight: '60vh' }}>
         <div
             className="flex align-items-center justify-content-center border-circle"
@@ -48,6 +64,24 @@ const SuccessScreen = ({ onContinue }: { onContinue: () => void }) => (
             <i className="pi pi-check text-white" style={{ fontSize: '3rem' }} />
         </div>
         <h2 className="m-0 text-900 font-bold" style={{ fontSize: '1.75rem' }}>¡Pedido confirmado!</h2>
+        {invoiceNumber && (
+            <p className="m-0 text-500 text-sm font-medium">
+                <i className="pi pi-receipt mr-2" />
+                Factura: <span className="text-900 font-bold">{invoiceNumber}</span>
+            </p>
+        )}
+        {upgrade && (
+            <div
+                className="flex flex-column align-items-center gap-1 px-4 py-3 border-round"
+                style={{ background: 'linear-gradient(135deg, #fff8e1, #fffde7)', border: '2px solid #f9a825', maxWidth: '420px' }}
+            >
+                <i className="pi pi-star-fill" style={{ fontSize: '1.5rem', color: '#f9a825' }} />
+                <span className="font-bold text-900" style={{ fontSize: '1.1rem' }}>{upgrade.mensaje}</span>
+                <span className="text-sm text-700">
+                    {upgrade.anterior} → <strong>{upgrade.actual}</strong>
+                </span>
+            </div>
+        )}
         <p className="text-600 m-0" style={{ maxWidth: '520px', lineHeight: '1.7', fontSize: '1.05rem' }}>
             Tu pedido fue confirmado con éxito. Ahora comenzaremos a prepararlo cuidadosamente para su entrega.
             Te mantendremos al tanto del estado de tu compra y te avisaremos en cuanto tu pedido vaya en camino.
@@ -89,6 +123,10 @@ const CheckoutPage = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [invoiceNumber, setInvoiceNumber] = useState<string | undefined>(undefined);
+    const [invoiceUpgrade, setInvoiceUpgrade] = useState<{ anterior: string; actual: string; mensaje: string } | null>(null);
+    const [clientDiscountPct, setClientDiscountPct] = useState(0);
+    const [clientDiscountLabel, setClientDiscountLabel] = useState('');
 
     // Auth guard: redirect to login if not authenticated
     useEffect(() => {
@@ -99,6 +137,14 @@ const CheckoutPage = () => {
         const currentUser = AuthService.getCurrentUser();
         setCustomer(currentUser);
         setTempCustomer(currentUser ? { ...currentUser } : null);
+        UserService.getOwn().then((persona) => {
+            if (!persona?.descuento) return
+            const pct = parseFloat(persona.descuento)
+            if (!isNaN(pct) && pct > 0) {
+                setClientDiscountPct(pct)
+                setClientDiscountLabel(persona.tipoPersona || 'Tu categoría')
+            }
+        })
     }, [router]);
 
     // Redirect if cart is empty (and not yet in success state)
@@ -115,22 +161,77 @@ const CheckoutPage = () => {
 
     const validate = (): boolean => {
         const newErrors: Record<string, string> = {};
-        if (cardNumber.replace(/\s/g, '').length < 16) newErrors.cardNumber = 'Ingresa un número de tarjeta válido de 16 dígitos.';
-        if (!cardName.trim()) newErrors.cardName = 'Ingresa el nombre impreso en la tarjeta.';
-        if (expiry.length < 5) newErrors.expiry = 'Ingresa la fecha en formato MM/AA.';
-        if (cvv.length < 3) newErrors.cvv = 'El CVV debe tener al menos 3 dígitos.';
+
+        if (cardNumber.replace(/\s/g, '').length < 16)
+            newErrors.cardNumber = 'Ingresa un número de tarjeta válido de 16 dígitos.';
+
+        if (!cardName.trim())
+            newErrors.cardName = 'Ingresa el nombre impreso en la tarjeta.';
+
+        // Validar fecha de vencimiento
+        if (expiry.length < 5) {
+            newErrors.expiry = 'Ingresa la fecha en formato MM/AA.';
+        } else {
+            const [mmStr, yyStr] = expiry.split('/');
+            const month = parseInt(mmStr, 10);
+            const year = parseInt(yyStr, 10);
+            if (isNaN(month) || month < 1 || month > 12) {
+                newErrors.expiry = 'El mes debe estar entre 01 y 12.';
+            } else if (isNaN(year) || yyStr.length !== 2) {
+                newErrors.expiry = 'El año debe tener 2 dígitos (ej: 27).';
+            } else {
+                const now = new Date();
+                const currentYear = now.getFullYear() % 100;  // últimos 2 dígitos
+                const currentMonth = now.getMonth() + 1;
+                if (year < currentYear || (year === currentYear && month < currentMonth)) {
+                    newErrors.expiry = 'La tarjeta está vencida.';
+                }
+            }
+        }
+
+        if (cvv.replace(/\D/g, '').length !== 3)
+            newErrors.cvv = 'El CVV debe tener exactamente 3 dígitos.';
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
         if (!validate()) return;
+        if (!customer) return;
         setIsProcessing(true);
-        setTimeout(() => {
+        setErrors({});
+        try {
+            const payload = buildFacturaPayload(cartItems, customer);
+            const result = await FacturacionService.emitirFactura(payload);
+            setInvoiceNumber(result?.encabezado?.['Número Factura']);
+
+            // Detectar upgrade de categoría
+            const enc = result?.encabezado
+            if (enc?.['Upgrade'] && enc['Categoría Anterior'] !== enc['Categoría Actual']) {
+                setInvoiceUpgrade({
+                    anterior: enc['Categoría Anterior'],
+                    actual: enc['Categoría Actual'],
+                    mensaje: enc['Upgrade']
+                })
+            }
+
+            // Refrescar perfil en sesión para que /shop muestre el nuevo descuento sin F5
+            UserService.getOwn().then((persona) => {
+                if (!persona) return
+                const session = localStorage.getItem('xstore-session')
+                if (!session) return
+                const user = JSON.parse(session)
+                localStorage.setItem('xstore-session', JSON.stringify({ ...user, _discountRefresh: Date.now() }))
+            })
+
             clearCart();
-            setIsProcessing(false);
             setIsSuccess(true);
-        }, 1800);
+        } catch (err: unknown) {
+            setErrors({ api: err instanceof Error ? err.message : 'Error al procesar la factura.' });
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handleContinue = () => {
@@ -151,7 +252,7 @@ const CheckoutPage = () => {
     };
 
     if (isSuccess) {
-        return <SuccessScreen onContinue={handleContinue} />;
+        return <SuccessScreen onContinue={handleContinue} invoiceNumber={invoiceNumber} upgrade={invoiceUpgrade} />;
     }
 
     return (
@@ -337,10 +438,10 @@ const CheckoutPage = () => {
                             <label className="block text-900 font-medium mb-2">CVV</label>
                             <InputText
                                 value={cvv}
-                                onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 3))}
                                 placeholder="123"
                                 className={`w-full ${errors.cvv ? 'p-invalid' : ''}`}
-                                maxLength={4}
+                                maxLength={3}
                                 keyfilter="int"
                                 type="password"
                             />
@@ -412,6 +513,15 @@ const CheckoutPage = () => {
                             <span>Subtotal</span>
                             <span className="font-medium text-900">{formatCurrency(subtotal)}</span>
                         </div>
+                        {clientDiscountPct > 0 && (
+                            <div className="flex justify-content-between text-sm mb-1" style={{ color: 'var(--green-600)' }}>
+                                <span className="flex align-items-center gap-1">
+                                    <i className="pi pi-percentage" style={{ fontSize: '0.75rem' }} />
+                                    {clientDiscountLabel} ({clientDiscountPct}%)
+                                </span>
+                                <span className="font-medium">Aplicado en factura</span>
+                            </div>
+                        )}
                         <div className="flex justify-content-between text-sm text-600 mb-3">
                             <span>Envío</span>
                             <Tag value="Gratis" severity="success" rounded />
@@ -423,6 +533,11 @@ const CheckoutPage = () => {
                             <span>Total</span>
                             <span style={{ color: 'var(--primary-color)' }}>{formatCurrency(total)}</span>
                         </div>
+
+                        {/* API error */}
+                        {errors.api && (
+                            <Message severity="error" className="w-full mb-3" text={errors.api} />
+                        )}
 
                         {/* Confirm button */}
                         <Button

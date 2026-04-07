@@ -20,6 +20,8 @@ import { RoleService } from '@/service/RoleService'
 const SYSTEM_ROUTES = [
     { label: 'Dashboard', value: '/' },
     { label: 'Tienda (Productos)', value: '/shop' },
+    { label: 'Mis Entregas', value: '/mis-entregas' },
+    { label: 'Mis Facturas', value: '/mis-facturas' },
     { label: 'Gestión de Productos', value: '/admin/products' },
     { label: 'Tipos de Producto', value: '/admin/product-types' },
     { label: 'Marcas', value: '/admin/brands' },
@@ -31,6 +33,8 @@ const SYSTEM_ROUTES = [
     { label: 'Usuarios', value: '/admin/users' },
     { label: 'Roles', value: '/admin/roles' },
     { label: 'Auditorías', value: '/admin/auditorias' },
+    { label: 'Entregas', value: '/admin/entregas' },
+    { label: 'Facturas', value: '/admin/facturas' },
     { label: 'Reportes', value: '/admin/reportes' }
 ]
 

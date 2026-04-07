@@ -5,11 +5,13 @@ import { Card } from 'primereact/card';
 import { Divider } from 'primereact/divider';
 import { Dropdown } from 'primereact/dropdown';
 import { InputText } from 'primereact/inputtext';
+import { Message } from 'primereact/message';
 import { Sidebar } from 'primereact/sidebar';
 import { Tag } from 'primereact/tag';
 
 import { useCart } from '../../../context/CartContext';
 import { Brand, Discount, Product, ProductFilters, ProductService, ProductType } from '../../../service/ProductService';
+import { UserService } from '../../../service/UserService';
 
 import CartSidebar from './CartSidebar';
 
@@ -23,13 +25,15 @@ const formatCurrency = (value: number) =>
 interface ProductDetailProps {
     product: Product;
     discounts: Discount[];
+    clientDiscountPct: number;
     onBack: () => void;
     onAddToCart: (product: Product) => void;
 }
 
-const ProductDetail = ({ product, discounts, onBack, onAddToCart }: ProductDetailProps) => {
+const ProductDetail = ({ product, discounts, clientDiscountPct, onBack, onAddToCart }: ProductDetailProps) => {
     const discount = discounts.find((d) => d.name === product.discountName);
     const discountedPrice = discount ? product.salePrice * (1 - discount.percentage / 100) : product.salePrice;
+    const clientFinalPrice = clientDiscountPct > 0 ? discountedPrice * (1 - clientDiscountPct / 100) : null;
 
     return (
         <div className="col-12">
@@ -80,6 +84,17 @@ const ProductDetail = ({ product, discounts, onBack, onAddToCart }: ProductDetai
                                     {formatCurrency(product.salePrice)}
                                 </span>
                             )}
+                            {clientFinalPrice !== null && (
+                                <div className="flex align-items-center gap-2 mt-1 p-2 border-round" style={{ background: 'var(--green-50)', border: '1px solid var(--green-200)' }}>
+                                    <i className="pi pi-percentage text-green-600" />
+                                    <span className="text-sm text-green-700 font-medium">
+                                        Tu precio con descuento de categoría ({clientDiscountPct}%):
+                                    </span>
+                                    <span className="font-bold text-green-700" style={{ fontSize: '1.1rem' }}>
+                                        {formatCurrency(clientFinalPrice)}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex flex-column gap-2 text-700">
@@ -126,13 +141,15 @@ const ProductDetail = ({ product, discounts, onBack, onAddToCart }: ProductDetai
 interface ProductCardProps {
     product: Product;
     discounts: Discount[];
+    clientDiscountPct: number;
     onView: (product: Product) => void;
     onAddToCart: (product: Product) => void;
 }
 
-const ProductCard = ({ product, discounts, onView, onAddToCart }: ProductCardProps) => {
+const ProductCard = ({ product, discounts, clientDiscountPct, onView, onAddToCart }: ProductCardProps) => {
     const discount = discounts.find((d) => d.name === product.discountName);
     const discountedPrice = discount ? product.salePrice * (1 - discount.percentage / 100) : product.salePrice;
+    const clientFinalPrice = clientDiscountPct > 0 ? discountedPrice * (1 - clientDiscountPct / 100) : null;
 
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
         e.currentTarget.src = 'https://static.thenounproject.com/png/504708-200.png';
@@ -179,7 +196,7 @@ const ProductCard = ({ product, discounts, onView, onAddToCart }: ProductCardPro
                 {/* Precio */}
                 <div className="mt-auto">
                     <span className="text-500 text-sm">Precio de venta</span>
-                    <div className="flex align-items-center gap-2 mb-3">
+                    <div className="flex align-items-center gap-2 mb-1">
                         {discount ? (
                             <>
                                 <span className="font-bold text-xl" style={{ color: '#e91e63' }}>
@@ -195,6 +212,14 @@ const ProductCard = ({ product, discounts, onView, onAddToCart }: ProductCardPro
                             </span>
                         )}
                     </div>
+                    {clientFinalPrice !== null && (
+                        <div className="flex align-items-center gap-1 mb-2 px-2 py-1 border-round" style={{ background: 'var(--green-50)', border: '1px solid var(--green-200)' }}>
+                            <i className="pi pi-percentage text-green-600" style={{ fontSize: '0.75rem' }} />
+                            <span className="text-xs text-green-700">Tu precio ({clientDiscountPct}% desc.):</span>
+                            <span className="font-bold text-green-700 text-sm ml-1">{formatCurrency(clientFinalPrice)}</span>
+                        </div>
+                    )}
+                    <div className="mb-2" />
 
                     {/* Botones */}
                     <div className="flex flex-column gap-2">
@@ -274,6 +299,8 @@ const ShopPage = () => {
     const [productTypes, setProductTypes] = useState<ProductType[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
     const [loading, setLoading] = useState(true);
+    const [clientDiscountPct, setClientDiscountPct] = useState(0);
+    const [clientDiscountLabel, setClientDiscountLabel] = useState('');
 
     const [filterVisible, setFilterVisible] = useState(false);
     const [cartVisible, setCartVisible] = useState(false);
@@ -297,6 +324,22 @@ const ShopPage = () => {
             setProductTypes(types);
             setBrands(brands);
         });
+        const fetchDiscount = () => {
+            UserService.getOwn().then((persona) => {
+                if (!persona?.descuento) return
+                const pct = parseFloat(persona.descuento)
+                if (!isNaN(pct) && pct > 0) {
+                    setClientDiscountPct(pct)
+                    setClientDiscountLabel(`${persona.tipoPersona || 'Tu categoría'} — ${pct}% de descuento`)
+                }
+            })
+        }
+        fetchDiscount()
+
+        // Re-leer al volver a la pestaña (cubre el caso de compra sin F5)
+        const onVisible = () => { if (document.visibilityState === 'visible') fetchDiscount() }
+        document.addEventListener('visibilitychange', onVisible)
+        return () => document.removeEventListener('visibilitychange', onVisible)
     }, []);
 
     const fetchProducts = useCallback(() => {
@@ -338,6 +381,7 @@ const ShopPage = () => {
                 <ProductDetail
                     product={detailProduct}
                     discounts={discounts}
+                    clientDiscountPct={clientDiscountPct}
                     onBack={() => setDetailProduct(null)}
                     onAddToCart={(p) => { addToCart(p); setDetailProduct(null); }}
                 />
@@ -383,6 +427,22 @@ const ShopPage = () => {
                 </div>
             </div>
 
+            {/* Client discount banner */}
+            {clientDiscountPct > 0 && (
+                <div className="col-12">
+                    <Message
+                        severity="success"
+                        className="w-full"
+                        content={
+                            <div className="flex align-items-center gap-2">
+                                <i className="pi pi-percentage" style={{ fontSize: '1.1rem' }} />
+                                <span className="font-medium">{clientDiscountLabel} en todos los productos</span>
+                            </div>
+                        }
+                    />
+                </div>
+            )}
+
             {/* Product Grid */}
             <div className="col-12">
                 {loading ? (
@@ -399,7 +459,7 @@ const ShopPage = () => {
                     <div className="grid">
                         {visibleProducts.map((product) => (
                             <div key={product.id} className="col-12 sm:col-6 lg:col-4 xl:col-3" style={{ display: 'flex' }}>
-                                <ProductCard product={product} discounts={discounts} onView={setDetailProduct} onAddToCart={addToCart} />
+                                <ProductCard product={product} discounts={discounts} clientDiscountPct={clientDiscountPct} onView={setDetailProduct} onAddToCart={addToCart} />
                             </div>
                         ))}
                     </div>
