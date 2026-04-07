@@ -1176,6 +1176,151 @@ Estado en tiempo real de envíos a domicilio con alerta de atraso.
 
 > `alertaEntrega` puede ser `"EN TIEMPO"`, `"VENCE HOY"` o `"ATRASADA"`.
 
+## Facturación y Entregas
+
+### `POST /api/facturas` 🔒
+
+Emite una factura a un cliente, descuenta el stock del inventario, aplica descuentos del producto y de la categoría del cliente, calcula IVA, y opcionalmente registra una entrega a domicilio. También evalúa si el cliente sube de categoría tras la compra.
+
+**Body:**
+
+```json
+{
+  "nombreUsuario": "AskingMansOz",
+  "identificacionCliente": "123456789",
+  "nombreUbicacion": "Bodega Central",
+  "productosJSON": "[{\"PRD_Descripcion\":\"Televisor 55\",\"TipoProducto\":\"Televisores\",\"Marca\":\"Samsung\",\"Proveedor\":\"Proveedor Demo\",\"Cantidad\":2}]",
+  "direccionEntrega": "Cartago Centro 100m Norte",
+  "observacionesEntrega": "Tocar el timbre",
+  "diasEntrega": 3,
+  "costoPorDiaEnvio": 750.0
+}
+```
+
+| Campo                   | Tipo          | Requerido | Default  | Descripción                                                                                                           |
+| ----------------------- | ------------- | --------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| `nombreUsuario`         | string        | Sí        | —        | Usuario vendedor, administrador o el mismo cliente                                                                    |
+| `identificacionCliente` | string        | Sí        | —        | Cédula/ID del cliente que compra                                                                                      |
+| `nombreUbicacion`       | string        | Sí        | —        | Nombre exacto de la ubicación de inventario desde donde se vende                                                      |
+| `productosJSON`         | string (JSON) | Sí        | —        | Array JSON con los productos. Cada ítem requiere `PRD_Descripcion`, `TipoProducto`, `Marca`, `Proveedor` y `Cantidad` |
+| `direccionEntrega`      | string        | No        | `null`   | Si se envía, activa el flujo de entrega a domicilio                                                                   |
+| `observacionesEntrega`  | string        | No        | `null`   | Notas adicionales para el repartidor                                                                                  |
+| `diasEntrega`           | int           | No        | `3`      | Días hábiles para la entrega (determina la fecha compromiso)                                                          |
+| `costoPorDiaEnvio`      | decimal       | No        | `750.00` | Costo por día de envío en colones                                                                                     |
+
+**Respuesta `data`:**
+
+```json
+{
+  "encabezado": {
+    "Número Factura": "FAC-20260406-00001",
+    "Fecha y Hora": "2026-04-06 14:30:00",
+    "Sucursal": "Bodega Central",
+    "Cliente": "Juan Pérez",
+    "Identificación": "123456789",
+    "Tipo Cliente": "Cliente Normal",
+    "Atendido por": "AskingMansOz (Vendedor)",
+    "Subtotal": 150000.0,
+    "Descuento Total": 15000.0,
+    "IVA %": 13.0,
+    "IVA": 17550.0,
+    "Costo Envío": 2250.0,
+    "Total": 154800.0,
+    "Con Entrega": "Sí",
+    "Fecha Entrega": "2026-04-09",
+    "Dirección Entrega": "Cartago Centro 100m Norte",
+    "Observaciones": "Tocar el timbre",
+    "Estado Entrega": "En Sucursal",
+    "Categoría Anterior": "Cliente Normal",
+    "Categoría Actual": "Cliente Frecuente",
+    "Upgrade": "¡Subió de categoría!"
+  },
+  "detalle": [
+    {
+      "Cantidad": 2,
+      "Producto": "Televisor 55",
+      "Tipo": "Televisores",
+      "Marca": "Samsung",
+      "Precio Unitario": 75000.0,
+      "Descuento Producto": "Black Friday 10%",
+      "Descuento Cliente %": 5.0,
+      "Monto Descuento": 15000.0,
+      "Subtotal Línea": 150000.0,
+      "Total Línea": 135000.0
+    }
+  ]
+}
+```
+
+> **Nota:** Un cliente solo puede facturarse a sí mismo. Vendedores y Administradores pueden facturar a cualquier cliente activo.
+
+---
+
+### `GET /api/entregas` 🔒
+
+Lista todas las entregas registradas con sus estados, datos del cliente y fechas. Permite filtrar por estado, cliente y rango de fechas.
+
+| Param           | Tipo     | Requerido | Default | Descripción                                                                      |
+| --------------- | -------- | --------- | ------- | -------------------------------------------------------------------------------- |
+| `nombreUsuario` | string   | Sí        | —       | Usuario con sesión activa                                                        |
+| `filtroEstado`  | string   | No        | —       | Nombre del estado de entrega (ej: `"En Sucursal"`, `"En camino"`, `"Entregado"`) |
+| `filtroCliente` | string   | No        | —       | Búsqueda parcial por nombre o identificación del cliente                         |
+| `fechaDesde`    | DateOnly | No        | —       | Fecha inicio del rango (formato `YYYY-MM-DD`)                                    |
+| `fechaHasta`    | DateOnly | No        | —       | Fecha fin del rango (formato `YYYY-MM-DD`)                                       |
+
+**Respuesta `data` (array):**
+
+```json
+[
+  {
+    "numeroFactura": "FAC-20260406-00001",
+    "cliente": "Juan Pérez",
+    "identificacion": "123456789",
+    "fechaFactura": "2026-04-06",
+    "totalFactura": 154800.0,
+    "direccionEntrega": "Cartago Centro 100m Norte",
+    "observaciones": "Tocar el timbre",
+    "fechaEntrega": "2026-04-09",
+    "estadoEntrega": "En Sucursal"
+  }
+]
+```
+
+---
+
+### `PUT /api/entregas` 🔒
+
+Actualiza el estado de una entrega identificada por número de factura. Los flags `enCamino` y `entregado` son mutuamente excluyentes; el SP determina el estado resultante según cuál se active.
+
+**Body:**
+
+```json
+{
+  "nombreUsuario": "AskingMansOz",
+  "numeroFactura": "FAC-20260406-00001",
+  "enCamino": true,
+  "entregado": false
+}
+```
+
+| Campo           | Tipo   | Requerido | Default | Descripción                             |
+| --------------- | ------ | --------- | ------- | --------------------------------------- |
+| `nombreUsuario` | string | Sí        | —       | Usuario que realiza la actualización    |
+| `numeroFactura` | string | Sí        | —       | Número de factura asociado a la entrega |
+| `enCamino`      | bool   | No        | `false` | Marca la entrega como "En camino"       |
+| `entregado`     | bool   | No        | `false` | Marca la entrega como "Entregado"       |
+
+**Respuesta:** solo envelope sin `data`.
+
+```json
+{
+  "success": true,
+  "message": "Estado de entrega actualizado correctamente."
+}
+```
+
+> `alertaEntrega` puede ser `"EN TIEMPO"`, `"VENCE HOY"` o `"ATRASADA"`.
+
 // 1. Health — GET /api/health
 // 2. Sesiones — PUT + POST /verificar (login) + POST /api/sesiones
 // 3. Roles — GET + POST + PUT /api/roles

@@ -18,7 +18,7 @@ const AppMenu = () => {
     }, []);
 
     // Rutas accesibles para cualquier usuario logueado (no requieren acceso explícito en el rol)
-    const AUTH_ROUTES = ['/profile'];
+    const AUTH_ROUTES = ['/profile', '/mis-entregas', '/mis-facturas'];
 
     const filterItems = (items: AppMenuItem[]): AppMenuItem[] => {
         if (!accesos) return items;
@@ -34,6 +34,8 @@ const AppMenu = () => {
             label: 'Store',
             items: [
                 { label: 'Tienda', icon: 'pi pi-fw pi-shopping-bag', to: '/shop' },
+                { label: 'Mis Entregas', icon: 'pi pi-fw pi-truck', to: '/mis-entregas' },
+                { label: 'Mis Facturas', icon: 'pi pi-fw pi-receipt', to: '/mis-facturas' },
                 { label: 'Mi Perfil', icon: 'pi pi-fw pi-user', to: '/profile' }
             ]
         },
@@ -49,6 +51,8 @@ const AppMenu = () => {
                 { label: 'Proveedores', icon: 'pi pi-fw pi-truck', to: '/admin/suppliers' },
                 { label: 'Roles', icon: 'pi pi-fw pi-users', to: '/admin/roles' },
                 { label: 'Auditorías', icon: 'pi pi-fw pi-history', to: '/admin/auditorias' },
+                { label: 'Entregas', icon: 'pi pi-fw pi-truck', to: '/admin/entregas' },
+                { label: 'Facturas', icon: 'pi pi-fw pi-receipt', to: '/admin/facturas' },
                 { label: 'Reportes', icon: 'pi pi-fw pi-chart-bar', to: '/admin/reportes' }
             ]
         },
